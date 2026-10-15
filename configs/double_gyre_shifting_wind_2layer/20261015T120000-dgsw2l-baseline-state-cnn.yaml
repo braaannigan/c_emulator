@@ -1,0 +1,61 @@
+experiment:
+  id: 20261015T120000-dgsw2l-baseline-state-cnn
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: baseline-state-cnn
+  kind: bigger_jump
+  rationale: >
+    First experiment in the family; establishes the reference rollout score.
+  hypothesis: >
+    A small CNN that maps the current two-layer state (layer thickness plus
+    centred zonal and meridional velocities for both layers) and the surface
+    wind stress to the next state establishes a first reference score for
+    fully autoregressive rollouts on the two-layer double-gyre shifting-wind
+    dataset.
+  conclusion: null
+
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261015T120000-dgsw2l-baseline-state-cnn.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+
+runtime:
+  seed: 42
+  device: auto
+  epochs: 20
+  smoke_test_epochs: 1
+
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+
+inputs:
+  state_fields: [layer_thickness, zonal_velocity_centered, meridional_velocity_centered]
+  layers: 2
+  conditioning_fields: [surface_wind_stress]
+
+training:
+  batch_size: 8
+  learning_rate: 0.0001
+
+model:
+  type: state_cnn
+  hidden_channels: 32
+  hidden_layers: 2
+  kernel_size: 3
+  target_mode: next_state
+  loss: mse
+
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+
+metrics:
+  primary: eval_mse_mean
+  definition: >
+    Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.

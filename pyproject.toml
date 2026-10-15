@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "emulator"
+version = "0.1.0"
+description = "Pipelines for running ocean model experiments."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "dask>=2025.1.0",
+    "future>=1.0.0",
+    "imageio>=2.37.0",
+    "imageio-ffmpeg>=0.6.0",
+    "ipython>=9.11.0",
+    "matplotlib>=3.10.0",
+    "netcdf4>=1.7.0",
+    "numpy>=2.0.0",
+    "plotly>=6.0.0",
+    "pytest>=9.0.2",
+    "pyyaml>=6.0.2",
+    "ray[tune]>=2.54.0",
+    "scipy>=1.15.0",
+    "skydiscover>=0.1.0",
+    "streamlit>=1.44.0",
+    "torch>=2.7.0",
+    "xarray>=2025.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-cov>=6.0.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+addopts = "-m 'not integration'"
+markers = [
+    "integration: end-to-end tests that execute the model runtime",
+]
+
+[tool.coverage.report]
+ignore_errors = true

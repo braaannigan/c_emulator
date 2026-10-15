@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(//Users/liambrannigan/playModels/emulator/**)",
+      "Read(//Users/liambrannigan/playModels/emulator_pi/**)",
+      "Read(//Users/liambrannigan/playModels/emulator_pi_search/**)",
+      "Bash(*emulator_pi*)",
+      "Bash(*playModels/emulator*)",
+      "Bash(*../emulator*)",
+      "Edit(/src/evaluation.py)",
+      "Write(/src/evaluation.py)"
+    ]
+  }
+}

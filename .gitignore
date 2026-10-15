@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+*.egg-info/
+.DS_Store
+data/**/*.nc
+data/double_gyre_shifting_wind_2layer/logs/*.json
+figs/
+.claude/settings.local.json
