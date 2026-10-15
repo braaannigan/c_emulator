@@ -16,7 +16,12 @@ experiment:
     raises long-lead covariance with the truth, lowering the 3-seed epochs 30-60 average below
     151.5 and the 3-seed final below 147.0 by more than ~10, with KE and h-std ratios above
     0.9.
-  conclusion: null
+  conclusion: 'Rejected. Two self-attention layers at the 25x12 bottleneck (+1.1M params)
+    make the model worse: 3-seed finals 162.1 / 157.2 / 180.5 (mean 166.6) and epochs 30-60
+    averages 164.8 / 154.6 / 174.7 (mean 164.7) vs the EMA incumbent''s 147.0 / 151.5, with
+    worse short-lead error (step-1 1.1-1.4 vs 0.8, step-5 5.8-7.2 vs 3.9) and higher velocity
+    MSE (0.0023-0.0025). Global coupling adds capacity that over-fits the 571 training pairs
+    rather than capturing predictable basin modes; the tail covariance is unchanged.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
