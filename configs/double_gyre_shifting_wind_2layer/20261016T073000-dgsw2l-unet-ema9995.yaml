@@ -12,7 +12,13 @@ experiment:
   hypothesis: Raising the EMA decay from 0.998 to 0.9995 lowers the 3-seed epochs 30-60 average
     below the incumbent's 151.5 and the 3-seed final below 147.0 by more than ~10, while keeping
     KE and h-std ratios above 0.9 at epochs 40-60 (the longer average lags more early on).
-  conclusion: null
+  conclusion: 'Rejected. With decay 0.9995 (~28-epoch horizon) the averaged weights still
+    mix in weights from early training even at epoch 60, and averaging very different networks
+    yields an over-smoothed model: step-1 MSE 8-9 (vs 0.8), KE ratio 0.30-0.45 and h-std 0.79-0.95
+    (lost eddy energy), so the rollout behaves like a damped climatology-seeking model. Scores
+    192.1 / 172.3 / 195.7 final (mean 186.7) and 200.3 / 187.4 / 213.6 over epochs 30-60 (mean
+    200.4) vs the incumbent''s 147.0 / 151.5. The averaging horizon must be short compared
+    with the training run; 0.998 (~7 epochs) is near the useful range.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

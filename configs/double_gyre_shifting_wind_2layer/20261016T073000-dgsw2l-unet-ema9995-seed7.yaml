@@ -8,7 +8,7 @@ experiment:
   hypothesis: Raising the EMA decay from 0.998 to 0.9995 lowers the 3-seed epochs 30-60 average
     below the incumbent's 151.5 and the 3-seed final below 147.0 by more than ~10, while keeping
     KE and h-std ratios above 0.9 at epochs 40-60 (the longer average lags more early on).
-  conclusion: null
+  conclusion: Seed replica; see 20261016T073000-dgsw2l-unet-ema9995.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
