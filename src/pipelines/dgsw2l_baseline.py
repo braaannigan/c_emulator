@@ -123,11 +123,15 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
     static = static_context(static_fields or [], state, train_indices, norm.input_mean, norm.input_std)
     n_static = 0 if static is None else static.shape[0]
     fixed_mask, fixed_values = fixed_cell_mask(state, train_indices) if model_cfg.get("fixed_land_cells", False) else (None, None)
-    net = build_state_model(model_cfg, inputs.shape[1] + n_static, state.shape[1])
+    forcing_window = int(model_cfg.get("forcing_window", 1))
+    n_state = state.shape[1]
+    input_mean = np.concatenate([norm.input_mean[:n_state], np.repeat(norm.input_mean[n_state:], forcing_window)])
+    input_std = np.concatenate([norm.input_std[:n_state], np.repeat(norm.input_std[n_state:], forcing_window)])
+    net = build_state_model(model_cfg, n_state + forcing_window + n_static, state.shape[1])
     return StateStepper(
         net,
-        norm.input_mean,
-        norm.input_std,
+        input_mean,
+        input_std,
         output_mean,
         output_std,
         target_mode=target_mode,
@@ -135,6 +139,7 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
         static=static,
         fixed_mask=fixed_mask,
         fixed_values=fixed_values,
+        forcing_window=forcing_window,
     )
 
 
@@ -152,10 +157,11 @@ def unrolled_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tens
         if stepper.fixed_mask.numel():
             noise = noise.masked_fill(stepper.fixed_mask, 0.0)
         current = current + noise
-    steps = winds.shape[1]
+    window = stepper.forcing_window
+    steps = winds.shape[1] - window + 1
     loss = states.new_zeros(())
     for k in range(steps):
-        current = stepper(current, winds[:, k])
+        current = stepper(current, winds[:, k : k + window])
         loss = loss + (((current - states[:, k + 1]) / stepper.output_std) ** 2).mean()
     return loss / steps
 
@@ -256,7 +262,8 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     train_indices, eval_indices = dgsw2l_pair_split(len(state), config.train_fraction)
     unroll_steps = int(config.raw.get("training", {}).get("unroll_steps", 1))
     noise_std = float(config.raw.get("training", {}).get("input_noise_std", 0.0))
-    dataset = RolloutWindowDataset(state, forcing, train_indices, unroll_steps)
+    forcing_window = int(config.raw.get("model", {}).get("forcing_window", 1))
+    dataset = RolloutWindowDataset(state, forcing, train_indices, unroll_steps, forcing_window)
     loader = DataLoader(dataset, batch_size=config.batch_size, shuffle=True)
     model_cfg = config.raw.get("model", {})
     static_fields = [str(name) for name in config.raw.get("inputs", {}).get("static_fields", [])]
@@ -283,6 +290,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
             "target_mode": stepper.target_mode,
             "mass_conserving": stepper.mass_conserving,
             "unroll_steps": unroll_steps,
+            "forcing_window": forcing_window,
             "input_noise_std": noise_std,
             "static_fields": static_fields,
             "fixed_land_cells": bool(stepper.fixed_mask.numel()),

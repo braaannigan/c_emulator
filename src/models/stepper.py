@@ -23,6 +23,10 @@ class StateStepper(nn.Module):
     ``fixed_mask`` ``(y, x)`` marks land cells whose state never changes; they
     are pinned to ``fixed_values`` ``(channels, y, x)`` after every step.
 
+    ``forcing_window`` is how many consecutive wind snapshots (from the step's
+    start time onwards) the network sees; ``input_mean``/``input_std`` then
+    carry one entry per forcing snapshot after the state channels.
+
     With ``mass_conserving`` the per-layer domain-mean thickness change is
     projected out (over wet cells when a fixed mask is given), so each layer's volume is conserved exactly (as in the
     source model).
@@ -40,11 +44,15 @@ class StateStepper(nn.Module):
         static: np.ndarray | None = None,
         fixed_mask: np.ndarray | None = None,
         fixed_values: np.ndarray | None = None,
+        forcing_window: int = 1,
     ):
         super().__init__()
         if target_mode not in {"next_state", "residual"}:
             raise ValueError(f"unknown target_mode {target_mode!r}")
+        if forcing_window < 1:
+            raise ValueError("forcing_window must be at least 1")
         self.net = net
+        self.forcing_window = forcing_window
         self.target_mode = target_mode
         self.mass_conserving = mass_conserving
         self.register_buffer("input_mean", torch.as_tensor(input_mean, dtype=torch.float32)[None, :, None, None])
@@ -61,7 +69,9 @@ class StateStepper(nn.Module):
         self.register_buffer("fixed_values", values)
 
     def forward(self, state: torch.Tensor, forcing: torch.Tensor) -> torch.Tensor:
-        x = (torch.cat([state, forcing[:, None]], dim=1) - self.input_mean) / self.input_std
+        if forcing.dim() == 3:
+            forcing = forcing[:, None]
+        x = (torch.cat([state, forcing], dim=1) - self.input_mean) / self.input_std
         if self.static.numel():
             x = torch.cat([x, self.static.expand(x.shape[0], -1, -1, -1)], dim=1)
         out = self.net(x) * self.output_std + self.output_mean
@@ -96,11 +106,12 @@ class StepperEmulator:
     def rollout(self, history: np.ndarray, forcing: np.ndarray, steps: int) -> np.ndarray:
         self.stepper.eval()
         start = len(history) - 1
+        window = self.stepper.forcing_window
         current = torch.from_numpy(history[-1:].astype("float32")).to(self.device)
         predictions: list[np.ndarray] = []
         with torch.no_grad():
             for offset in range(steps):
-                wind = torch.from_numpy(forcing[start + offset][None].astype("float32")).to(self.device)
+                wind = torch.from_numpy(forcing[start + offset : start + offset + window][None].astype("float32")).to(self.device)
                 current = self.stepper(current, wind)
                 predictions.append(current.cpu().numpy()[0])
         return np.stack(predictions)

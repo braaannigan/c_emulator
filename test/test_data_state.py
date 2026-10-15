@@ -77,3 +77,9 @@ def test_fit_increment_normalisation_and_rollout_windows():
         RolloutWindowDataset(state, forcing, np.arange(4), unroll_steps=0)
     with pytest.raises(ValueError):
         RolloutWindowDataset(state, forcing, np.arange(2), unroll_steps=5)
+    with pytest.raises(ValueError):
+        RolloutWindowDataset(state, forcing, np.arange(4), forcing_window=0)
+    paired = RolloutWindowDataset(state, forcing, np.arange(5), unroll_steps=2, forcing_window=2)
+    assert len(paired) == 4  # start 3 needs winds 3..5, the last snapshot
+    _, winds = paired[3]
+    np.testing.assert_allclose(winds[:, 0, 0], [3.0, 4.0, 5.0])

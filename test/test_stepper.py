@@ -74,3 +74,26 @@ def test_fixed_cells_without_mass_projection_and_argument_pairing():
     assert float(out[0, 0, 0, 0]) == 5.0 and float(out[0, 0, 1, 1]) == 1.0
     with pytest.raises(ValueError):
         StateStepper(AddOne(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), fixed_mask=mask)
+
+
+class SeesWind(torch.nn.Module):
+    """Residual net whose output is the sum of all forcing channels (inputs 6..)."""
+
+    def forward(self, x):
+        return x[:, 6:].sum(dim=1, keepdim=True).expand(-1, 6, -1, -1)
+
+
+def test_forcing_window_feeds_consecutive_winds_to_network():
+    stepper = StateStepper(SeesWind(), np.zeros(8), np.ones(8), np.zeros(6), np.ones(6), target_mode="residual", forcing_window=2)
+    out = stepper(torch.zeros(1, 6, 2, 2), torch.stack([torch.full((2, 2), 1.0), torch.full((2, 2), 2.0)])[None])
+    torch.testing.assert_close(out, torch.full((1, 6, 2, 2), 3.0))
+    with pytest.raises(ValueError):
+        StateStepper(SeesWind(), np.zeros(8), np.ones(8), np.zeros(6), np.ones(6), forcing_window=0)
+
+
+def test_emulator_rollout_uses_wind_at_step_start_and_end():
+    stepper = StateStepper(SeesWind(), np.zeros(8), np.ones(8), np.zeros(6), np.ones(6), target_mode="residual", forcing_window=2)
+    forcing = np.arange(5, dtype="float32")[:, None, None] * np.ones((5, 2, 2), dtype="float32")
+    # start = 1; steps use winds (1, 2), (2, 3), (3, 4) -> increments 3, 5, 7.
+    pred = StepperEmulator(stepper, torch.device("cpu")).rollout(np.zeros((2, 6, 2, 2), dtype="float32"), forcing, 3)
+    np.testing.assert_allclose(pred[:, 0, 0, 0], [3.0, 8.0, 15.0])

@@ -1,0 +1,70 @@
+experiment:
+  id: 20261016T023000-dgsw2l-unet-wind-pair
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: unet-wind-pair
+  kind: medium_step
+  rationale: The stepper only sees the wind stress at the start of each 7-day step, but the
+    wind shifts with a 40-day period, so its phase advances ~63 degrees within one step and
+    the forcing actually applied over the interval is poorly described by its start value.
+    The evaluator legitimately exposes the known wind up to the end of the rollout, so the
+    wind at t+1 can be given without touching eval-period truth. The depth-4 and unroll-16
+    runs showed that more capacity or longer horizons over-fit; better-specified inputs are
+    the remaining cheap lever.
+  hypothesis: Feeding the U-Net incumbent the wind at both the start (t) and end (t+1) of
+    each step lowers short-lead error (step-1 below 0.9, step-5 below 4.6) and the final eval_mse_mean
+    below 155.8 with an epochs 30-60 average below ~166, while staying bounded with KE and
+    h-std ratios above 0.9.
+  conclusion: null
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261016T023000-dgsw2l-unet-wind-pair.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+model:
+  type: unet
+  hidden_channels: 32
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+  depth: 3
+  forcing_window: 2
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '

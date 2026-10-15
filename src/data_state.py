@@ -96,16 +96,22 @@ class RolloutWindowDataset(Dataset):
     inside those pairs are used, so no target leaves the training split.
     """
 
-    def __init__(self, state: np.ndarray, forcing: np.ndarray, indices: np.ndarray, unroll_steps: int = 1):
+    def __init__(self, state: np.ndarray, forcing: np.ndarray, indices: np.ndarray, unroll_steps: int = 1, forcing_window: int = 1):
         if unroll_steps < 1:
             raise ValueError("unroll_steps must be at least 1")
+        if forcing_window < 1:
+            raise ValueError("forcing_window must be at least 1")
         last_target = int(indices.max()) + 1
-        self.starts = np.array([t for t in indices if t + unroll_steps <= last_target], dtype="int64")
+        self.starts = np.array(
+            [t for t in indices if t + unroll_steps <= last_target and t + unroll_steps + forcing_window - 1 <= len(forcing)],
+            dtype="int64",
+        )
         if len(self.starts) == 0:
             raise ValueError("no training window fits inside the training split")
         self.state = state
         self.forcing = forcing
         self.unroll_steps = unroll_steps
+        self.forcing_window = forcing_window
 
     def __len__(self) -> int:
         return len(self.starts)
@@ -113,4 +119,4 @@ class RolloutWindowDataset(Dataset):
     def __getitem__(self, item: int) -> tuple[torch.Tensor, torch.Tensor]:
         t = int(self.starts[item])
         k = self.unroll_steps
-        return torch.from_numpy(self.state[t : t + k + 1].astype("float32")), torch.from_numpy(self.forcing[t : t + k].astype("float32"))
+        return torch.from_numpy(self.state[t : t + k + 1].astype("float32")), torch.from_numpy(self.forcing[t : t + k + self.forcing_window - 1].astype("float32"))

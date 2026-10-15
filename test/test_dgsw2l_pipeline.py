@@ -161,15 +161,29 @@ def test_run_experiment_full_saves_rollout_netcdf_when_enabled(tmp_path):
         assert "rollout_meridional_velocity_centered" in ds
 
 
+def test_build_stepper_forcing_window_repeats_wind_normalisation():
+    rng = np.random.default_rng(0)
+    state = rng.normal(size=(6, 6, 3, 3)).astype("float32")
+    inputs = np.concatenate([state, rng.normal(size=(6, 1, 3, 3)).astype("float32")], axis=1)
+    stepper = build_stepper({"hidden_channels": 2, "hidden_layers": 1, "target_mode": "residual", "forcing_window": 2}, inputs, state, np.arange(4))
+    assert stepper.forcing_window == 2 and stepper.net.net[0].in_channels == 8
+    mean = stepper.input_mean.flatten()
+    assert mean.shape == (8,) and float(mean[6]) == float(mean[7])
+    winds = torch.zeros(2, 3, 3, 3)
+    loss = unrolled_loss(stepper, torch.zeros(2, 3, 6, 3, 3), winds)
+    assert torch.isfinite(loss)
+
+
 def test_run_experiment_residual_mass_conserving_unrolled(tmp_path):
     config = write_config(tmp_path)
-    config.raw["model"].update({"target_mode": "residual", "mass_conserving": True})
+    config.raw["model"].update({"target_mode": "residual", "mass_conserving": True, "forcing_window": 2})
     config.raw["training"]["unroll_steps"] = 2
 
     run_experiment(config, smoke_test=True)
 
     log = json.loads(config.experiment_log.read_text())
     assert log["metadata"]["unroll_steps"] == 2
+    assert log["metadata"]["forcing_window"] == 2
     assert log["metadata"]["target_mode"] == "residual"
     assert log["metadata"]["mass_conserving"] is True
 
