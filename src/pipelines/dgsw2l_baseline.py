@@ -18,6 +18,7 @@ from src.data_state import RolloutWindowDataset, dgsw2l_pair_split, fit_channel_
 from src.evaluation import N_LAYERS, STATE_CHANNELS, evaluate_rollout
 from src.models.baseline_cnn import StateCNN
 from src.models.stepper import StateStepper, StepperEmulator
+from src.models.unet import StateUNet
 from src.results import append_result
 
 
@@ -53,15 +54,27 @@ def decay_learning_rate(optimiser: torch.optim.Optimizer, factor: float) -> None
 
 
 def build_state_model(model_cfg: dict[str, Any], in_channels: int, out_channels: int) -> nn.Module:
-    """Build the configured dgsw2l state model."""
+    """Build the configured dgsw2l state model (``state_cnn`` or ``unet``)."""
 
+    model_type = str(model_cfg.get("type", "state_cnn"))
+    padding_mode = str(model_cfg.get("padding_mode", "zeros"))
+    if model_type == "unet":
+        return StateUNet(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            base_channels=int(model_cfg.get("hidden_channels", 32)),
+            depth=int(model_cfg.get("depth", 3)),
+            padding_mode=padding_mode,
+        )
+    if model_type != "state_cnn":
+        raise ValueError(f"unknown model type {model_type!r}")
     return StateCNN(
         in_channels=in_channels,
         out_channels=out_channels,
         hidden_channels=int(model_cfg.get("hidden_channels", 32)),
         hidden_layers=int(model_cfg.get("hidden_layers", 2)),
         kernel_size=int(model_cfg.get("kernel_size", 3)),
-        padding_mode=str(model_cfg.get("padding_mode", "zeros")),
+        padding_mode=padding_mode,
     )
 
 
