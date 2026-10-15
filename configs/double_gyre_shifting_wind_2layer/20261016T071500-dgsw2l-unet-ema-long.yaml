@@ -15,7 +15,14 @@ experiment:
     80 lowers the 3-seed epochs 65-100 average below the incumbent's epochs 30-60 average
     of 151.5 and the 3-seed final eval_mse_mean below 147.0 by more than ~10, keeping KE and
     h-std ratios above 0.9.
-  conclusion: null
+  conclusion: 'Rejected. Up to epoch 60 these runs reproduce the incumbent (epochs 30-60 averages
+    156.9 / 142.8 / 154.9, mean 151.5, identical to the EMA incumbent''s 151.5), a useful
+    reproducibility check. Continuing to 100 epochs with LR decay x0.3 at 60 and 80 sharpens
+    short leads (step-5 3.2-3.8, step-20 17-22) but the tail gets worse: epochs 65-100 averages
+    156.2 / 181.4 / 143.9 (mean 160.5) and finals 168.2 / 201.3 / 148.6 (mean 172.7) vs the
+    incumbent''s 151.5 / 147.0. Late low-LR training fits the 571 training pairs more closely
+    (over-fitting the trajectory statistics) without extending predictability. Keep 60 epochs
+    at constant LR with EMA.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

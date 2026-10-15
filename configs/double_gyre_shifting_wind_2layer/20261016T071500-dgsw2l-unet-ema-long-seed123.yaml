@@ -9,7 +9,7 @@ experiment:
     80 lowers the 3-seed epochs 65-100 average below the incumbent's epochs 30-60 average
     of 151.5 and the 3-seed final eval_mse_mean below 147.0 by more than ~10, keeping KE and
     h-std ratios above 0.9.
-  conclusion: null
+  conclusion: Seed replica; see 20261016T071500-dgsw2l-unet-ema-long.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
