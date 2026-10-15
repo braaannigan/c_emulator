@@ -17,7 +17,16 @@ experiment:
     incumbent U-Net recipe lowers step-1/5/10/20 lead MSE and, averaged over seeds 42/7/123,
     gives a final eval_mse_mean below the incumbent's two-seed mean of 151.9 and an epochs
     30-60 average below ~166, while staying bounded with KE and h-std ratios above 0.9.
-  conclusion: null
+  conclusion: 'Rejected across three seeds (run in parallel on RunPod RTX 4090s, 6-15 min
+    each incl. startup). Final eval_mse_mean 184.2 / 176.8 / 171.7 (seeds 42/7/123, mean 177.6)
+    vs the incumbent''s 155.8 / 148.0 (mean 151.9); epochs 30-60 averages 184.6 / 177.0 /
+    188.1 vs ~166. The tendency input does sharpen the first step (step-1 MSE 0.5-0.6 vs 0.9)
+    but mid-lead error gets worse (step-10 17-22 vs 11; step-20 ~similar), so the free run
+    decorrelates sooner. In rollout the tendency channel is the model''s own previous increment,
+    so its errors are fed back with a gain: the network learns to extrapolate the tendency,
+    which is accurate for one step under teacher forcing but amplifies drift. Fidelity stayed
+    acceptable (KE 0.87-0.95, h-std 0.94-1.00). Caveat: these ran on CUDA while the incumbent
+    ran on MPS; a CUDA control of the incumbent is needed before reading small differences.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

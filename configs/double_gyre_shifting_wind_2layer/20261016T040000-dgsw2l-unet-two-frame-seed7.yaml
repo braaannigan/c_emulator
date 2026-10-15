@@ -10,7 +10,8 @@ experiment:
     incumbent U-Net recipe lowers step-1/5/10/20 lead MSE and, averaged over seeds 42/7/123,
     gives a final eval_mse_mean below the incumbent's two-seed mean of 151.9 and an epochs
     30-60 average below ~166, while staying bounded with KE and h-std ratios above 0.9.
-  conclusion: null
+  conclusion: Seed replica; see 20261016T040000-dgsw2l-unet-two-frame for the joint three-seed
+    conclusion (final 176.8).
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
