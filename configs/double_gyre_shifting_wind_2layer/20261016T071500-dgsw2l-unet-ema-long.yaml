@@ -1,0 +1,74 @@
+experiment:
+  id: 20261016T071500-dgsw2l-unet-ema-long
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: unet-ema-long
+  kind: tuning
+  rationale: 'The new EMA incumbent is level with the control at the final checkpoint but
+    clearly better over epochs 30-60, and its training loss is still falling at epoch 60.
+    The earlier single-seed 100-epoch run with LR decay (x0.3 at epochs 60 and 80) had the
+    lowest late-training average seen (epochs 65-100: 143) and the best short-lead skill (step-1
+    0.7, step-5 3.4), but noisy single checkpoints. EMA is the natural complement: it removes
+    the checkpoint noise that made that run inconclusive. Tuning run around the new incumbent,
+    three seeds in parallel.'
+  hypothesis: Training the EMA incumbent for 100 epochs with LR decay x0.3 at epochs 60 and
+    80 lowers the 3-seed epochs 65-100 average below the incumbent's epochs 30-60 average
+    of 151.5 and the 3-seed final eval_mse_mean below 147.0 by more than ~10, keeping KE and
+    h-std ratios above 0.9.
+  conclusion: null
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261016T071500-dgsw2l-unet-ema-long.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 100
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+  ema_decay: 0.998
+  lr_decay_milestones:
+  - 60
+  - 80
+  lr_decay_factor: 0.3
+model:
+  type: unet
+  hidden_channels: 32
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+  depth: 3
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '
