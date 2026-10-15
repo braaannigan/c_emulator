@@ -1,0 +1,74 @@
+experiment:
+  id: 20261015T191000-dgsw2l-noise-injection
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: noise-injection
+  kind: medium_step
+  rationale: With land pinned, the remaining instability is grid-scale growth seeded in the
+    western-boundary-current separation region; the model only ever trains on smooth true
+    states and its own 8-step errors, so it is never taught to damp grid-scale perturbations.
+  hypothesis: Adding white noise (1 increment-std per channel, wet cells only) to the start
+    state of every 8-step training window, with clean true targets, teaches the land-mask
+    CNN to damp grid-scale errors and keeps its 143-step rollouts bounded at every scheduled
+    checkpoint, with eval_mse_mean below climatology (136.8).
+  conclusion: 'Supported: first stable emulator. Noise injection (1 increment-std white noise
+    on wet cells of each window''s start state) on top of the land-mask recipe keeps all 12
+    scheduled 143-step rollouts bounded (eval_mse_mean 155-261, final 215.7 / last 393.6 /
+    vel 0.00258), beating persistence (297.7) at every checkpoint, with physically consistent
+    variance (h-std ratio 0.92-1.04, KE ratio 0.68-0.87, no late-lead growth). It does not
+    beat climatology (136.8): it behaves as a variance-preserving free-running model whose
+    error saturates near 2x climate variance after ~30 steps (~200-300), as anticipated by
+    the predictability diagnostics. Short-lead skill is preserved (step-1 7.8, step-5 54,
+    step-10 60). Candidate incumbent pending seed check.'
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261015T191000-dgsw2l-noise-injection.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+model:
+  type: state_cnn
+  hidden_channels: 32
+  hidden_layers: 2
+  kernel_size: 3
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '

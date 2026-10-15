@@ -125,10 +125,20 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
     )
 
 
-def unrolled_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tensor) -> torch.Tensor:
-    """Mean over unrolled steps of the MSE in output-normalised units."""
+def unrolled_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tensor, noise_std: float = 0.0) -> torch.Tensor:
+    """Mean over unrolled steps of the MSE in output-normalised units.
+
+    ``noise_std`` > 0 perturbs the window's start state with white noise of
+    ``noise_std`` output-std units on wet cells, while the targets stay the
+    true states, so the model learns to damp its own small-scale errors.
+    """
 
     current = states[:, 0]
+    if noise_std > 0:
+        noise = torch.randn_like(current) * stepper.output_std * noise_std
+        if stepper.fixed_mask.numel():
+            noise = noise.masked_fill(stepper.fixed_mask, 0.0)
+        current = current + noise
     steps = winds.shape[1]
     loss = states.new_zeros(())
     for k in range(steps):
@@ -143,6 +153,7 @@ def train_one_epoch(
     optimiser: torch.optim.Optimizer,
     device: torch.device,
     gradient_clip_norm: float | None = None,
+    noise_std: float = 0.0,
 ) -> float:
     stepper.train()
     losses: list[float] = []
@@ -150,7 +161,7 @@ def train_one_epoch(
         states = states.to(device)
         winds = winds.to(device)
         optimiser.zero_grad(set_to_none=True)
-        loss = unrolled_loss(stepper, states, winds)
+        loss = unrolled_loss(stepper, states, winds, noise_std)
         loss.backward()
         if gradient_clip_norm is not None:
             torch.nn.utils.clip_grad_norm_(stepper.parameters(), gradient_clip_norm)
@@ -231,6 +242,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     forcing = inputs[:, STATE_CHANNELS]
     train_indices, eval_indices = dgsw2l_pair_split(len(state), config.train_fraction)
     unroll_steps = int(config.raw.get("training", {}).get("unroll_steps", 1))
+    noise_std = float(config.raw.get("training", {}).get("input_noise_std", 0.0))
     dataset = RolloutWindowDataset(state, forcing, train_indices, unroll_steps)
     loader = DataLoader(dataset, batch_size=config.batch_size, shuffle=True)
     model_cfg = config.raw.get("model", {})
@@ -258,6 +270,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
             "target_mode": stepper.target_mode,
             "mass_conserving": stepper.mass_conserving,
             "unroll_steps": unroll_steps,
+            "input_noise_std": noise_std,
             "static_fields": static_fields,
             "fixed_land_cells": bool(stepper.fixed_mask.numel()),
             "primary_metric": "layer-thickness MSE of fully autoregressive rollout (src/evaluation.py)",
@@ -272,7 +285,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     emulator = StepperEmulator(stepper, device)
     for epoch in range(1, epochs + 1):
         started = time.perf_counter()
-        loss = train_one_epoch(stepper, loader, optimiser, device, gradient_clip_norm=config.gradient_clip_norm)
+        loss = train_one_epoch(stepper, loader, optimiser, device, gradient_clip_norm=config.gradient_clip_norm, noise_std=noise_std)
         elapsed = time.perf_counter() - started
         log["epochs"].append(
             {

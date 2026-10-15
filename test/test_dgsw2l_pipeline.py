@@ -216,3 +216,29 @@ def test_fixed_cell_mask_and_land_mask_channel():
     inputs = np.concatenate([state, np.zeros((6, 1, 3, 4), dtype="float32")], axis=1)
     stepper = build_stepper({"hidden_channels": 2, "hidden_layers": 1, "target_mode": "residual", "fixed_land_cells": True}, inputs, state, idx)
     assert stepper.fixed_mask.shape == (1, 1, 3, 4)
+
+
+def test_unrolled_loss_noise_perturbs_wet_cells_only():
+    from src.models.stepper import StateStepper
+
+    class Zero(torch.nn.Module):
+        def forward(self, x):
+            return torch.zeros_like(x[:, :6])
+
+    mask = np.ones((2, 2), dtype=bool)
+    pinned = StateStepper(Zero(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual", fixed_mask=mask, fixed_values=np.zeros((6, 2, 2)))
+    free = StateStepper(Zero(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual")
+    states = torch.zeros(4, 2, 6, 2, 2)
+    winds = torch.zeros(4, 1, 2, 2)
+    assert float(unrolled_loss(pinned, states, winds, noise_std=1.0)) == 0.0
+    torch.manual_seed(0)
+    assert float(unrolled_loss(free, states, winds, noise_std=1.0)) == pytest.approx(1.0, rel=0.5)
+
+
+def test_run_experiment_logs_noise_std(tmp_path):
+    config = write_config(tmp_path)
+    config.raw["training"]["input_noise_std"] = 0.5
+
+    run_experiment(config, smoke_test=True)
+
+    assert json.loads(config.experiment_log.read_text())["metadata"]["input_noise_std"] == 0.5
