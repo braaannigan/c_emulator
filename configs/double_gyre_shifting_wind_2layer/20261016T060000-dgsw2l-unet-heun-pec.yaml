@@ -17,7 +17,15 @@ experiment:
     in the incumbent recipe lowers mid-lead error (step-10/20) and gives a 3-seed final eval_mse_mean
     below the CUDA control's 148.9 and a 3-seed epochs 30-60 mean below 167.1 by more than
     ~10, with KE and h-std ratios above 0.9.
-  conclusion: null
+  conclusion: 'Neutral, not promoted. Heun predictor-corrector integration (two U-Net evaluations
+    per step, ~2x run time: 10-12 min on RTX 4090) gives 3-seed final eval_mse_mean 126.3
+    / 132.1 / 180.3 (mean 146.2) vs the CUDA control''s 128.9 / 168.1 / 149.7 (mean 148.9),
+    and 3-seed epochs 30-60 means 159.7 / 159.0 / 181.3 (mean 166.7) vs 167.1. Both differences
+    are far inside the ~10-point standard error. Lead-time error and fidelity (KE 0.87-1.01,
+    h-std 0.96-1.02) are also indistinguishable. Second-order time integration does not change
+    the error growth: the learned one-step map was already smooth enough, and the chaotic
+    divergence after ~20 steps is set by the dynamics, not the integrator. Not worth the 2x
+    cost.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
