@@ -17,7 +17,14 @@ experiment:
     incumbent lowers short- and mid-lead error (step-5/10/20) and gives a 3-seed epochs 30-60
     average below 151.5 and a 3-seed final below 147.0 by more than ~10, with KE and h-std
     ratios above 0.9.
-  conclusion: null
+  conclusion: 'Rejected. Supplying the 3.5-day semi-Lagrangian advected state as six extra
+    input channels does not help: 3-seed finals 170.4 / 166.5 / 175.1 (mean 170.7) and epochs
+    30-60 averages 165.8 / 160.0 / 161.5 (mean 162.4) vs the EMA incumbent''s 147.0 / 151.5.
+    Short-lead skill is unchanged (step-1 0.7-0.8, step-5 3.9-4.4) and step-10/20 is slightly
+    worse (16-21 vs 14-18), so the U-Net already extracts the motion information that frozen-field
+    advection provides; the extra channels add over-fitting capacity. Velocity MSE is marginally
+    lower (0.0020 vs 0.0021) and fidelity unchanged (KE 0.93-0.96). Runs need CUDA (grid_sample
+    backward is missing on MPS; local smoke used PYTORCH_ENABLE_MPS_FALLBACK=1).'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
