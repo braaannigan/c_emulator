@@ -9,7 +9,7 @@ experiment:
     below the CUDA control's 148.9 and the 3-seed epochs 30-60 mean below 167.1 by more than
     ~10, and narrows the spread across scheduled rollouts, with KE and h-std ratios above
     0.9.
-  conclusion: null
+  conclusion: Seed replica; see 20261016T061500-dgsw2l-unet-ema.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
