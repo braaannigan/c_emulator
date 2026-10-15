@@ -1,0 +1,66 @@
+experiment:
+  id: 20261015T200500-dgsw2l-noise-injection-seed7
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: noise-injection-seed7
+  kind: tuning
+  rationale: Seed check required before promoting the first stable model (noise-injection)
+    to incumbent.
+  hypothesis: 'The noise-injection recipe is seed-robust: with seed 7 all scheduled rollouts
+    stay bounded and the final eval_mse_mean is within ~20% of seed 42 (215.7).'
+  conclusion: Seed check passed. Seed 7 keeps all 12 scheduled rollouts bounded (155-234),
+    final 209.3 / last 307.6 / vel 0.00247 vs seed 42's 215.7 / 393.6 / 0.00258, with matching
+    variance diagnostics (h-std ratio 0.90-1.09, KE 0.69-0.89). The noise-injection recipe
+    is promoted to incumbent (seed-42 run as the reference; two-seed final mean 212.5).
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261015T200500-dgsw2l-noise-injection-seed7.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 7
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+model:
+  type: state_cnn
+  hidden_channels: 32
+  hidden_layers: 2
+  kernel_size: 3
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '

@@ -1,0 +1,70 @@
+experiment:
+  id: 20261015T170500-dgsw2l-static-context
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: static-context
+  kind: medium_step
+  rationale: The unroll-8 residual mass-conserving CNN gains mid-lead skill but slowly diverges.
+    With a 7-cell receptive field and no position or reference information, it cannot tell
+    where it is in the closed basin (western boundary current, walls) nor what state its anomalies
+    should relax toward, so drift is unconstrained.
+  hypothesis: Appending static context channels -- the training time-mean state (normalised
+    like the state) and y/x coordinates in [-1, 1] -- to the unroll-8 residual mass-conserving
+    CNN lets it learn location-dependent dynamics and relaxation toward the mean state, yielding
+    a stable 143-step rollout with eval_mse_mean below climatology (136.8).
+  conclusion: 'Rejected: still unstable, but clearly better early. Static context (training-mean
+    state + coordinates) lowers the epoch-5 rollout to 178 (vs 564 without) with physical
+    variance (h-std ratio 0.97, KE 0.68) and step-20 MSE ~100, yet divergence still sets in
+    after ~60 steps and worsens with training (final 4.0e7). Checkpoint diagnosis: the blow-up
+    is seeded at the western wall (x=0, y~186, the western-boundary-current region) and is
+    grid-scale (>40% of error energy at |k|>0.25 by step 60), with h0 going negative. Points
+    to the zero-padded boundary treatment as the instability source.'
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261015T170500-dgsw2l-static-context.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+model:
+  type: state_cnn
+  hidden_channels: 32
+  hidden_layers: 2
+  kernel_size: 3
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '

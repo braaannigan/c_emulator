@@ -53,3 +53,27 @@ def test_state_dataset_normalises_next_state():
 
     assert x.shape == (7, 2, 2)
     assert y.shape == (6, 2, 2)
+    assert len(dataset) == 3
+
+
+def test_fit_increment_normalisation_and_rollout_windows():
+    import pytest
+
+    from src.data_state import RolloutWindowDataset, fit_increment_normalisation
+
+    state = np.arange(6, dtype="float32")[:, None, None, None] * np.ones((6, 2, 2, 2), dtype="float32")
+    state[:, 1] *= 0.0
+    mean, std = fit_increment_normalisation(state, np.arange(4))
+    np.testing.assert_allclose(mean, [1.0, 0.0])
+    np.testing.assert_allclose(std, [1.0, 1.0])
+
+    forcing = np.arange(6, dtype="float32")[:, None, None] * np.ones((6, 2, 2), dtype="float32")
+    ds = RolloutWindowDataset(state, forcing, np.arange(4), unroll_steps=2)
+    assert len(ds) == 3  # starts 0..2 keep target index <= 4
+    states, winds = ds[2]
+    assert states.shape == (3, 2, 2, 2) and winds.shape == (2, 2, 2)
+    assert float(states[-1, 0, 0, 0]) == 4.0 and float(winds[0, 0, 0]) == 2.0
+    with pytest.raises(ValueError):
+        RolloutWindowDataset(state, forcing, np.arange(4), unroll_steps=0)
+    with pytest.raises(ValueError):
+        RolloutWindowDataset(state, forcing, np.arange(2), unroll_steps=5)

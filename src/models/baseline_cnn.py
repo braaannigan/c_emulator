@@ -14,6 +14,7 @@ class StateCNN(nn.Module):
         hidden_channels: int = 32,
         hidden_layers: int = 2,
         kernel_size: int = 3,
+        padding_mode: str = "zeros",
     ):
         super().__init__()
         if hidden_layers < 1:
@@ -26,12 +27,12 @@ class StateCNN(nn.Module):
         for _ in range(hidden_layers):
             layers.extend(
                 [
-                    nn.Conv2d(previous_channels, hidden_channels, kernel_size=kernel_size, padding=padding),
+                    nn.Conv2d(previous_channels, hidden_channels, kernel_size=kernel_size, padding=padding, padding_mode=padding_mode),
                     nn.GELU(),
                 ]
             )
             previous_channels = hidden_channels
-        layers.append(nn.Conv2d(previous_channels, out_channels, kernel_size=3, padding=1))
+        layers.append(nn.Conv2d(previous_channels, out_channels, kernel_size=3, padding=1, padding_mode=padding_mode))
         self.net = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

@@ -1,0 +1,65 @@
+experiment:
+  id: 20261015T163000-dgsw2l-unroll8-residual-mass
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: unroll8-residual-mass
+  kind: medium_step
+  rationale: Residual + volume-projection model has good one-step skill but exponential rollout
+    divergence; one-step MSE gives no gradient signal about how its own errors propagate.
+  hypothesis: Training the residual mass-conserving CNN on 8-step autoregressive unrolls (backprop
+    through its own predictions, loss averaged over steps, grad clip 1.0) makes the 143-step
+    rollout stable and, because MSE over chaotic multi-week horizons rewards relaxation toward
+    the mean, pushes eval_mse_mean below climatology (136.8).
+  conclusion: 'Rejected: still unstable, but slower divergence. 8-step unrolled training improves
+    mid-lead skill (step-10 thickness MSE ~70 vs ~158 for one-step training; step-5 ~65) and
+    early rollouts stay near physical variance (epoch 5: h-std ratio 1.04, eval_mse_mean 564),
+    but every scheduled rollout eventually diverges after ~20-50 steps and the divergence
+    worsens as training proceeds (final 7.3e11). The model has no reference state to relax
+    toward and no notion of position (walls, western boundary); next candidates: static climatology/coordinate
+    context, noise injection, larger receptive field.'
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261015T163000-dgsw2l-unroll8-residual-mass.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+model:
+  type: state_cnn
+  hidden_channels: 32
+  hidden_layers: 2
+  kernel_size: 3
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '
