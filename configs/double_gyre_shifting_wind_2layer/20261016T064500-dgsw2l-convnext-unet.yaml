@@ -16,7 +16,15 @@ experiment:
     equal parameter count, all else equal, lowers mid-lead error and gives a 3-seed final
     eval_mse_mean below 148.9 and a 3-seed epochs 30-60 mean below 167.1 by more than ~10,
     while staying bounded with KE and h-std ratios above 0.9.
-  conclusion: null
+  conclusion: 'Neutral, not promoted. At equal size (1.93M params) the ConvNeXt U-Net learns
+    much faster (epoch 5: step-1 MSE 2.4-2.7 vs 6.6-8.3, rollouts 166-210 vs 232-391 for the
+    control) but ends no better: 3-seed final eval_mse_mean 160.1 / 176.1 / 162.5 (mean 166.2)
+    vs the CUDA control''s 148.9, and 3-seed epochs 30-60 mean 162.0 / 175.2 / 164.1 (mean
+    167.1) vs 167.1. Late short-lead skill is slightly better (step-5 3.7-4.1, step-20 13-15
+    vs 18-26) but the tail beyond ~50 steps is unchanged, so the overall score is unchanged.
+    It costs ~2.5x the run time (13-15 min). The block design is not the bottleneck; its faster
+    convergence might matter in combination with EMA or shorter schedules, but the tail sets
+    the score.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

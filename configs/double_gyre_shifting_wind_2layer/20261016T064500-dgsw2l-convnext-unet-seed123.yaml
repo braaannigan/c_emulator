@@ -9,7 +9,7 @@ experiment:
     equal parameter count, all else equal, lowers mid-lead error and gives a 3-seed final
     eval_mse_mean below 148.9 and a 3-seed epochs 30-60 mean below 167.1 by more than ~10,
     while staying bounded with KE and h-std ratios above 0.9.
-  conclusion: null
+  conclusion: Seed replica; see 20261016T064500-dgsw2l-convnext-unet.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
