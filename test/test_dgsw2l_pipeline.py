@@ -276,3 +276,26 @@ def test_run_experiment_with_ema_evaluates_and_saves_averaged_weights(tmp_path, 
         torch.testing.assert_close(saved[name], value)
     assert not isinstance(seen["stepper"], torch.optim.swa_utils.AveragedModel)
     assert seen["stepper"] is not None
+
+
+def test_unrolled_loss_channel_weights_scale_per_channel_errors():
+    class Zero(torch.nn.Module):
+        def forward(self, x):
+            return torch.zeros_like(x[:, :6])
+
+    from src.models.stepper import StateStepper
+
+    stepper = StateStepper(Zero(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual")
+    states = torch.zeros(1, 2, 6, 2, 2)
+    states[:, 1, 0] = 1.0  # error only in h0
+    winds = torch.zeros(1, 1, 2, 2)
+    plain = float(unrolled_loss(stepper, states, winds))
+    weighted = float(unrolled_loss(stepper, states, winds, channel_weights=torch.tensor([3.0, 1, 1, 1, 1, 1])))
+    assert plain == pytest.approx(1 / 6) and weighted == pytest.approx(3 / 6)
+
+
+def test_run_experiment_logs_channel_loss_weights(tmp_path):
+    config = write_config(tmp_path)
+    config.raw["training"]["channel_loss_weights"] = [2, 2, 0.5, 0.5, 0.5, 0.5]
+    run_experiment(config, smoke_test=True)
+    assert json.loads(config.experiment_log.read_text())["metadata"]["channel_loss_weights"] == [2, 2, 0.5, 0.5, 0.5, 0.5]

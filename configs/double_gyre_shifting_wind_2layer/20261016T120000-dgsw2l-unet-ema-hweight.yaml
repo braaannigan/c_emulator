@@ -1,0 +1,76 @@
+experiment:
+  id: 20261016T120000-dgsw2l-unet-ema-hweight
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: unet-ema-hweight
+  kind: medium_step
+  rationale: The benchmark scores only layer thickness, but training weights all six normalised
+    channels equally, so two thirds of the gradient goes to velocities. Velocities matter
+    as dynamical inputs, yet their exact grid-scale values may be over-fitted at the expense
+    of thickness. Reweighting the unrolled loss toward thickness (mean weight kept at 1) changes
+    the objective without touching the architecture or data; a strong (h 2.5 / uv 0.25) and
+    a mild (h 1.75 / uv 0.625) arm run in parallel, three seeds each.
+  hypothesis: Weighting the unrolled loss toward layer thickness (h 2.5, u/v 0.25 per channel)
+    lowers thickness error at short and mid leads and gives a 3-seed epochs 30-60 average
+    below 151.5 and a 3-seed final below 147.0 by more than ~10, with velocity MSE rising
+    by less than 20% and KE above 0.85.
+  conclusion: null
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261016T120000-dgsw2l-unet-ema-hweight.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+  ema_decay: 0.998
+  channel_loss_weights:
+  - 2.5
+  - 2.5
+  - 0.25
+  - 0.25
+  - 0.25
+  - 0.25
+model:
+  type: unet
+  hidden_channels: 32
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+  depth: 3
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '
