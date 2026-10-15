@@ -1,0 +1,73 @@
+experiment:
+  id: 20261016T013000-dgsw2l-unet-depth4
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: unet-depth4
+  kind: tuning
+  rationale: The incumbent 3-level U-Net bottoms out at 25x12 cells. Lead-time error at steps
+    5-20 (4.6/11/25) sets how long the free run tracks the true eddies before saturating,
+    and the unroll16 and long-LR runs showed the remaining gains must come from short/mid-lead
+    skill rather than horizon tricks. A fourth level (12x6 bottleneck) roughly doubles the
+    receptive field so basin-scale Rossby-wave and gyre adjustment signals can be seen in
+    one step, at little cost because the extra level is tiny.
+  hypothesis: Adding a fourth U-Net level (all else equal to the incumbent recipe) lowers
+    step-5/10/20 lead MSE, keeps all scheduled rollouts bounded with KE and h-std ratios above
+    0.9, and gives a final eval_mse_mean below 155.8 with an epochs 30-60 average below ~166.
+  conclusion: 'Rejected. The 4-level U-Net (7.9M params vs 2.0M) stayed bounded with good
+    fidelity (KE 0.94-0.98, h-std 0.97-1.00) but was worse at every lead: step-1 1.4 vs 0.9,
+    step-5 8.3 vs 4.6, step-10 26 vs 11 at epoch 60. Final 172.6 / 301.5 / 0.00272 vs incumbent
+    155.8 / 332.5 / 0.00228; epochs 30-60 average 171.9 vs ~166. Training loss fell lower
+    (0.38 vs 0.63) while eval lead errors rose, so the extra capacity over-fits the 571 training
+    pairs rather than exploiting the larger receptive field. Capacity is not the bottleneck;
+    regularisation or better inputs are more promising.'
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261016T013000-dgsw2l-unet-depth4.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+model:
+  type: unet
+  hidden_channels: 32
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+  depth: 4
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '
