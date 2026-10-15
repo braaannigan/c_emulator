@@ -135,6 +135,7 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
         static=static,
         fixed_mask=fixed_mask,
         fixed_values=fixed_values,
+        integrator=str(model_cfg.get("integrator", "euler")),
     )
 
 
@@ -283,6 +284,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
             "target_mode": stepper.target_mode,
             "mass_conserving": stepper.mass_conserving,
             "unroll_steps": unroll_steps,
+            "integrator": str(model_cfg.get("integrator", "euler")),
             "input_noise_std": noise_std,
             "static_fields": static_fields,
             "fixed_land_cells": bool(stepper.fixed_mask.numel()),

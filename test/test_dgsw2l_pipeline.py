@@ -163,13 +163,14 @@ def test_run_experiment_full_saves_rollout_netcdf_when_enabled(tmp_path):
 
 def test_run_experiment_residual_mass_conserving_unrolled(tmp_path):
     config = write_config(tmp_path)
-    config.raw["model"].update({"target_mode": "residual", "mass_conserving": True})
+    config.raw["model"].update({"target_mode": "residual", "mass_conserving": True, "integrator": "heun"})
     config.raw["training"]["unroll_steps"] = 2
 
     run_experiment(config, smoke_test=True)
 
     log = json.loads(config.experiment_log.read_text())
     assert log["metadata"]["unroll_steps"] == 2
+    assert log["metadata"]["integrator"] == "heun"
     assert log["metadata"]["target_mode"] == "residual"
     assert log["metadata"]["mass_conserving"] is True
 

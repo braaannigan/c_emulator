@@ -74,3 +74,35 @@ def test_fixed_cells_without_mass_projection_and_argument_pairing():
     assert float(out[0, 0, 0, 0]) == 5.0 and float(out[0, 0, 1, 1]) == 1.0
     with pytest.raises(ValueError):
         StateStepper(AddOne(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), fixed_mask=mask)
+
+
+class Halve(torch.nn.Module):
+    """Residual net returning minus half the state: dx = -x/2."""
+
+    def forward(self, x):
+        return -0.5 * x[:, :6]
+
+
+def test_heun_integrator_averages_start_and_predicted_increments():
+    with pytest.raises(ValueError):
+        StateStepper(Halve(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), integrator="rk9")
+    euler = StateStepper(Halve(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual")
+    heun = StateStepper(Halve(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual", integrator="heun")
+    state = torch.full((1, 6, 2, 2), 4.0)
+    torch.testing.assert_close(euler(state, torch.zeros(1, 2, 2)), torch.full((1, 6, 2, 2), 2.0))
+    # d1 = -2 at x=4; predictor x=2 gives d2 = -1; Heun step = 4 + (-2 - 1) / 2 = 2.5.
+    torch.testing.assert_close(heun(state, torch.zeros(1, 2, 2)), torch.full((1, 6, 2, 2), 2.5))
+
+
+def test_heun_keeps_land_pinned_and_volume_conserved():
+    torch.manual_seed(0)
+    mask = np.zeros((4, 4), dtype=bool)
+    mask[0] = True
+    values = np.zeros((6, 4, 4), dtype="float32")
+    values[:2] = 200.0
+    stepper = StateStepper(Noise(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual", mass_conserving=True, fixed_mask=mask, fixed_values=values, integrator="heun")
+    state = torch.from_numpy(np.broadcast_to(values, (2, 6, 4, 4)).copy())
+    state[:, :2, 1:] += torch.randn(2, 2, 3, 4)
+    out = stepper(state, torch.zeros(2, 4, 4))
+    torch.testing.assert_close(out[:, :, 0], torch.from_numpy(values[:, 0]).expand(2, -1, -1))
+    torch.testing.assert_close(out[:, :2].sum(dim=(2, 3)), state[:, :2].sum(dim=(2, 3)))

@@ -26,6 +26,10 @@ class StateStepper(nn.Module):
     With ``mass_conserving`` the per-layer domain-mean thickness change is
     projected out (over wet cells when a fixed mask is given), so each layer's volume is conserved exactly (as in the
     source model).
+
+    ``integrator`` ``euler`` adds one network increment per step; ``heun``
+    treats the network as a tendency and applies a predictor-corrector step
+    (two network evaluations), as in PEC-integrated ocean emulators.
     """
 
     def __init__(
@@ -40,10 +44,14 @@ class StateStepper(nn.Module):
         static: np.ndarray | None = None,
         fixed_mask: np.ndarray | None = None,
         fixed_values: np.ndarray | None = None,
+        integrator: str = "euler",
     ):
         super().__init__()
         if target_mode not in {"next_state", "residual"}:
             raise ValueError(f"unknown target_mode {target_mode!r}")
+        if integrator not in {"euler", "heun"}:
+            raise ValueError(f"unknown integrator {integrator!r}")
+        self.integrator = integrator
         self.net = net
         self.target_mode = target_mode
         self.mass_conserving = mass_conserving
@@ -61,6 +69,17 @@ class StateStepper(nn.Module):
         self.register_buffer("fixed_values", values)
 
     def forward(self, state: torch.Tensor, forcing: torch.Tensor) -> torch.Tensor:
+        delta = self.increment(state, forcing)
+        if self.integrator == "heun":
+            # Predictor-corrector (Heun): average the increment at the start
+            # state and at the predicted state. The constraints are linear, so
+            # the averaged increment still conserves volume and spares land.
+            delta = 0.5 * (delta + self.increment(self.pin(state + delta), forcing))
+        return self.pin(state + delta)
+
+    def increment(self, state: torch.Tensor, forcing: torch.Tensor) -> torch.Tensor:
+        """Network increment with land cells zeroed and (optionally) layer volume projected out."""
+
         x = (torch.cat([state, forcing[:, None]], dim=1) - self.input_mean) / self.input_std
         if self.static.numel():
             x = torch.cat([x, self.static.expand(x.shape[0], -1, -1, -1)], dim=1)
@@ -80,10 +99,12 @@ class StateStepper(nn.Module):
             else:
                 h_delta = h_delta - h_delta.mean(dim=(2, 3), keepdim=True)
             delta = torch.cat([h_delta, delta[:, N_LAYERS:]], dim=1)
-        nxt = state + delta
-        if has_fixed:
-            nxt = torch.where(self.fixed_mask, self.fixed_values, nxt)
-        return nxt
+        return delta
+
+    def pin(self, state: torch.Tensor) -> torch.Tensor:
+        if self.fixed_mask.numel():
+            return torch.where(self.fixed_mask, self.fixed_values, state)
+        return state
 
 
 class StepperEmulator:
