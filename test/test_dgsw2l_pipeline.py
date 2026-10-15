@@ -276,3 +276,27 @@ def test_run_experiment_with_ema_evaluates_and_saves_averaged_weights(tmp_path, 
         torch.testing.assert_close(saved[name], value)
     assert not isinstance(seen["stepper"], torch.optim.swa_utils.AveragedModel)
     assert seen["stepper"] is not None
+
+
+def test_unrolled_loss_step_noise_perturbs_later_steps_only():
+    class Zero(torch.nn.Module):
+        def forward(self, x):
+            return torch.zeros_like(x[:, :6])
+
+    from src.models.stepper import StateStepper
+
+    stepper = StateStepper(Zero(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual")
+    states = torch.zeros(1, 3, 6, 4, 4)
+    winds = torch.zeros(1, 2, 4, 4)
+    assert float(unrolled_loss(stepper, states, winds)) == 0.0
+    one_step = unrolled_loss(stepper, states[:, :2], winds[:, :1], step_noise_std=1.0)
+    assert float(one_step) == 0.0  # no later step to perturb
+    torch.manual_seed(0)
+    assert float(unrolled_loss(stepper, states, winds, step_noise_std=1.0)) > 0.0
+
+
+def test_run_experiment_logs_step_noise(tmp_path):
+    config = write_config(tmp_path)
+    config.raw["training"].update({"unroll_steps": 2, "step_noise_std": 0.3})
+    run_experiment(config, smoke_test=True)
+    assert json.loads(config.experiment_log.read_text())["metadata"]["step_noise_std"] == 0.3

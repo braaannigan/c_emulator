@@ -139,23 +139,30 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
     )
 
 
-def unrolled_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tensor, noise_std: float = 0.0) -> torch.Tensor:
+def unrolled_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tensor, noise_std: float = 0.0, step_noise_std: float = 0.0) -> torch.Tensor:
     """Mean over unrolled steps of the MSE in output-normalised units.
 
     ``noise_std`` > 0 perturbs the window's start state with white noise of
     ``noise_std`` output-std units on wet cells, while the targets stay the
     true states, so the model learns to damp its own small-scale errors.
+    ``step_noise_std`` > 0 also perturbs the model's own prediction before
+    every later unrolled step, so damping is learned along the whole window.
     """
+
+    def perturb(field: torch.Tensor, std: float) -> torch.Tensor:
+        noise = torch.randn_like(field) * stepper.output_std * std
+        if stepper.fixed_mask.numel():
+            noise = noise.masked_fill(stepper.fixed_mask, 0.0)
+        return field + noise
 
     current = states[:, 0]
     if noise_std > 0:
-        noise = torch.randn_like(current) * stepper.output_std * noise_std
-        if stepper.fixed_mask.numel():
-            noise = noise.masked_fill(stepper.fixed_mask, 0.0)
-        current = current + noise
+        current = perturb(current, noise_std)
     steps = winds.shape[1]
     loss = states.new_zeros(())
     for k in range(steps):
+        if k and step_noise_std > 0:
+            current = perturb(current, step_noise_std)
         current = stepper(current, winds[:, k])
         loss = loss + (((current - states[:, k + 1]) / stepper.output_std) ** 2).mean()
     return loss / steps
@@ -169,6 +176,7 @@ def train_one_epoch(
     gradient_clip_norm: float | None = None,
     noise_std: float = 0.0,
     ema: AveragedModel | None = None,
+    step_noise_std: float = 0.0,
 ) -> float:
     stepper.train()
     losses: list[float] = []
@@ -176,7 +184,7 @@ def train_one_epoch(
         states = states.to(device)
         winds = winds.to(device)
         optimiser.zero_grad(set_to_none=True)
-        loss = unrolled_loss(stepper, states, winds, noise_std)
+        loss = unrolled_loss(stepper, states, winds, noise_std, step_noise_std)
         loss.backward()
         if gradient_clip_norm is not None:
             torch.nn.utils.clip_grad_norm_(stepper.parameters(), gradient_clip_norm)
@@ -260,6 +268,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     train_indices, eval_indices = dgsw2l_pair_split(len(state), config.train_fraction)
     unroll_steps = int(config.raw.get("training", {}).get("unroll_steps", 1))
     noise_std = float(config.raw.get("training", {}).get("input_noise_std", 0.0))
+    step_noise_std = float(config.raw.get("training", {}).get("step_noise_std", 0.0))
     dataset = RolloutWindowDataset(state, forcing, train_indices, unroll_steps)
     loader = DataLoader(dataset, batch_size=config.batch_size, shuffle=True)
     model_cfg = config.raw.get("model", {})
@@ -289,6 +298,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
             "unroll_steps": unroll_steps,
             "ema_decay": config.raw.get("training", {}).get("ema_decay"),
             "input_noise_std": noise_std,
+            "step_noise_std": step_noise_std,
             "static_fields": static_fields,
             "fixed_land_cells": bool(stepper.fixed_mask.numel()),
             "primary_metric": "layer-thickness MSE of fully autoregressive rollout (src/evaluation.py)",
@@ -308,7 +318,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     emulator = StepperEmulator(eval_stepper, device)
     for epoch in range(1, epochs + 1):
         started = time.perf_counter()
-        loss = train_one_epoch(stepper, loader, optimiser, device, gradient_clip_norm=config.gradient_clip_norm, noise_std=noise_std, ema=ema)
+        loss = train_one_epoch(stepper, loader, optimiser, device, gradient_clip_norm=config.gradient_clip_norm, noise_std=noise_std, ema=ema, step_noise_std=step_noise_std)
         elapsed = time.perf_counter() - started
         log["epochs"].append(
             {
