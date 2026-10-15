@@ -5,6 +5,7 @@ import torch
 from torch import nn
 
 from src.evaluation import N_LAYERS
+from src.models.advection import advect_state
 
 
 class StateStepper(nn.Module):
@@ -26,6 +27,10 @@ class StateStepper(nn.Module):
     With ``mass_conserving`` the per-layer domain-mean thickness change is
     projected out (over wet cells when a fixed mask is given), so each layer's volume is conserved exactly (as in the
     source model).
+
+    ``advection`` (``dt_seconds``, ``dx_metres``, ``substeps``) appends the
+    semi-Lagrangian advected state (normalised like the state inputs) to the
+    network input, after the forcing channel and before the static channels.
     """
 
     def __init__(
@@ -40,11 +45,13 @@ class StateStepper(nn.Module):
         static: np.ndarray | None = None,
         fixed_mask: np.ndarray | None = None,
         fixed_values: np.ndarray | None = None,
+        advection: dict | None = None,
     ):
         super().__init__()
         if target_mode not in {"next_state", "residual"}:
             raise ValueError(f"unknown target_mode {target_mode!r}")
         self.net = net
+        self.advection = None if advection is None else {k: advection[k] for k in ("dt_seconds", "dx_metres", "substeps")}
         self.target_mode = target_mode
         self.mass_conserving = mass_conserving
         self.register_buffer("input_mean", torch.as_tensor(input_mean, dtype=torch.float32)[None, :, None, None])
@@ -62,6 +69,10 @@ class StateStepper(nn.Module):
 
     def forward(self, state: torch.Tensor, forcing: torch.Tensor) -> torch.Tensor:
         x = (torch.cat([state, forcing[:, None]], dim=1) - self.input_mean) / self.input_std
+        if self.advection is not None:
+            n_state = state.shape[1]
+            advected = advect_state(state, float(self.advection["dt_seconds"]), float(self.advection["dx_metres"]), int(self.advection["substeps"]))
+            x = torch.cat([x, (advected - self.input_mean[:, :n_state]) / self.input_std[:, :n_state]], dim=1)
         if self.static.numel():
             x = torch.cat([x, self.static.expand(x.shape[0], -1, -1, -1)], dim=1)
         out = self.net(x) * self.output_std + self.output_mean

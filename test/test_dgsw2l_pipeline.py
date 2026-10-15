@@ -276,3 +276,20 @@ def test_run_experiment_with_ema_evaluates_and_saves_averaged_weights(tmp_path, 
         torch.testing.assert_close(saved[name], value)
     assert not isinstance(seen["stepper"], torch.optim.swa_utils.AveragedModel)
     assert seen["stepper"] is not None
+
+
+def test_build_stepper_with_advection_prior_widens_input():
+    rng = np.random.default_rng(0)
+    state = rng.normal(size=(6, 6, 4, 5)).astype("float32")
+    inputs = np.concatenate([state, np.zeros((6, 1, 4, 5), dtype="float32")], axis=1)
+    cfg = {"hidden_channels": 2, "hidden_layers": 1, "target_mode": "residual", "advection_prior": {"dt_seconds": 1000.0, "dx_metres": 1e4, "substeps": 2}}
+    stepper = build_stepper(cfg, inputs, state, np.arange(4))
+    assert stepper.net.net[0].in_channels == 13
+    assert stepper(torch.from_numpy(state[:2]), torch.zeros(2, 4, 5)).shape == (2, 6, 4, 5)
+
+
+def test_run_experiment_logs_advection_prior(tmp_path):
+    config = write_config(tmp_path)
+    config.raw["model"]["advection_prior"] = {"dt_seconds": 1000.0, "dx_metres": 1e4, "substeps": 1}
+    run_experiment(config, smoke_test=True)
+    assert json.loads(config.experiment_log.read_text())["metadata"]["advection_prior"]["substeps"] == 1

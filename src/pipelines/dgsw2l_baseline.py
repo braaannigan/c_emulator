@@ -124,7 +124,9 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
     static = static_context(static_fields or [], state, train_indices, norm.input_mean, norm.input_std)
     n_static = 0 if static is None else static.shape[0]
     fixed_mask, fixed_values = fixed_cell_mask(state, train_indices) if model_cfg.get("fixed_land_cells", False) else (None, None)
-    net = build_state_model(model_cfg, inputs.shape[1] + n_static, state.shape[1])
+    advection = model_cfg.get("advection_prior")
+    n_advected = state.shape[1] if advection else 0
+    net = build_state_model(model_cfg, inputs.shape[1] + n_advected + n_static, state.shape[1])
     return StateStepper(
         net,
         norm.input_mean,
@@ -136,6 +138,7 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
         static=static,
         fixed_mask=fixed_mask,
         fixed_values=fixed_values,
+        advection=advection,
     )
 
 
@@ -287,6 +290,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
             "target_mode": stepper.target_mode,
             "mass_conserving": stepper.mass_conserving,
             "unroll_steps": unroll_steps,
+            "advection_prior": model_cfg.get("advection_prior"),
             "ema_decay": config.raw.get("training", {}).get("ema_decay"),
             "input_noise_std": noise_std,
             "static_fields": static_fields,
