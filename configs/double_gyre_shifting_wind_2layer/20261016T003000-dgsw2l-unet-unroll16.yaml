@@ -1,0 +1,73 @@
+experiment:
+  id: 20261016T003000-dgsw2l-unet-unroll16
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: unet-unroll16
+  kind: medium_step
+  rationale: With the U-Net, lead-time error is small through ~10 steps but grows through
+    steps 20-60, and the 50-143-step tail dominates eval_mse_mean. Longer training (100 epochs)
+    improved only the first ~30 steps. The 8-step unroll gives no training signal about how
+    errors evolve beyond 8 steps (56 days), which is longer than the ~5-step anomaly decorrelation
+    time.
+  hypothesis: Training the incumbent U-Net recipe on 16-step unrolls (112 days, loss averaged
+    over all steps) improves mid-lead error (steps 20-60) and keeps the rollout stable, lowering
+    final eval_mse_mean below 155.8 and the epochs 30-60 average below ~166, at the cost of
+    a small loss of variance (h-std ratio stays above 0.85).
+  conclusion: 'Rejected. Doubling the training unroll to 16 steps made the U-Net worse at
+    every lead: step-1 MSE 1.5 vs 0.9, step-10 23 vs 11, step-20 39 vs 25 at epoch 60, and
+    the final rollout scored 199.0 / 476.6 / 0.00270 against the incumbent''s 155.8 / 332.5
+    / 0.00228. Epochs 30-60 average 169.7, no better than the 8-step run (~166). The longer
+    unroll halves the number of optimiser updates per epoch at fixed wall-clock budget and
+    its gradients are dominated by the chaotic late steps, so it under-fits the short-lead
+    dynamics without buying mid-lead skill. Keep unroll 8.'
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261016T003000-dgsw2l-unet-unroll16.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 16
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+model:
+  type: unet
+  hidden_channels: 32
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+  depth: 3
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '
