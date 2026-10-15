@@ -66,6 +66,7 @@ def build_state_model(model_cfg: dict[str, Any], in_channels: int, out_channels:
             base_channels=int(model_cfg.get("hidden_channels", 32)),
             depth=int(model_cfg.get("depth", 3)),
             padding_mode=padding_mode,
+            attention_layers=int(model_cfg.get("attention_layers", 0)),
         )
     if model_type != "state_cnn":
         raise ValueError(f"unknown model type {model_type!r}")

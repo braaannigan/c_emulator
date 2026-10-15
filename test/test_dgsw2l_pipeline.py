@@ -250,6 +250,7 @@ def test_build_state_model_unet_and_unknown_type():
     model = build_state_model({"type": "unet", "hidden_channels": 4, "depth": 2}, 7, 6)
     assert isinstance(model, StateUNet)
     assert model(torch.zeros(1, 7, 8, 8)).shape == (1, 6, 8, 8)
+    assert build_state_model({"type": "unet", "hidden_channels": 4, "depth": 2, "attention_layers": 1}, 7, 6).attention is not None
     with pytest.raises(ValueError):
         build_state_model({"type": "bogus"}, 7, 6)
 
