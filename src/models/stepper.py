@@ -17,6 +17,9 @@ class StateStepper(nn.Module):
     - ``residual``: the output is the normalised increment, added to the
       current state.
 
+    ``static`` holds already-normalised time-invariant context channels
+    ``(channels, y, x)`` appended to every network input.
+
     With ``mass_conserving`` the per-layer domain-mean thickness change is
     projected out, so each layer's volume is conserved exactly (as in the
     source model).
@@ -31,6 +34,7 @@ class StateStepper(nn.Module):
         output_std: np.ndarray,
         target_mode: str = "next_state",
         mass_conserving: bool = False,
+        static: np.ndarray | None = None,
     ):
         super().__init__()
         if target_mode not in {"next_state", "residual"}:
@@ -42,10 +46,14 @@ class StateStepper(nn.Module):
         self.register_buffer("input_std", torch.as_tensor(input_std, dtype=torch.float32)[None, :, None, None])
         self.register_buffer("output_mean", torch.as_tensor(output_mean, dtype=torch.float32)[None, :, None, None])
         self.register_buffer("output_std", torch.as_tensor(output_std, dtype=torch.float32)[None, :, None, None])
+        static_tensor = torch.zeros(0) if static is None else torch.as_tensor(static, dtype=torch.float32)[None]
+        self.register_buffer("static", static_tensor)
 
     def forward(self, state: torch.Tensor, forcing: torch.Tensor) -> torch.Tensor:
-        x = torch.cat([state, forcing[:, None]], dim=1)
-        out = self.net((x - self.input_mean) / self.input_std) * self.output_std + self.output_mean
+        x = (torch.cat([state, forcing[:, None]], dim=1) - self.input_mean) / self.input_std
+        if self.static.numel():
+            x = torch.cat([x, self.static.expand(x.shape[0], -1, -1, -1)], dim=1)
+        out = self.net(x) * self.output_std + self.output_mean
         if self.target_mode == "residual":
             delta = out
         else:

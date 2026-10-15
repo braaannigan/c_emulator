@@ -12,6 +12,7 @@ from src.pipelines.dgsw2l_baseline import (
     build_state_model,
     build_stepper,
     rollout_diagnostics,
+    static_context,
     unrolled_loss,
     current_learning_rate,
     decay_learning_rate,
@@ -167,3 +168,32 @@ def test_run_experiment_residual_mass_conserving_unrolled(tmp_path):
     assert log["metadata"]["unroll_steps"] == 2
     assert log["metadata"]["target_mode"] == "residual"
     assert log["metadata"]["mass_conserving"] is True
+
+
+def test_static_context_channels_and_stepper_input_width():
+    rng = np.random.default_rng(0)
+    state = rng.normal(size=(6, 6, 3, 4)).astype("float32")
+    inputs = np.concatenate([state, np.zeros((6, 1, 3, 4), dtype="float32")], axis=1)
+    idx = np.arange(4)
+    mean, std = np.zeros(7, dtype="float32"), np.full(7, 2.0, dtype="float32")
+    static = static_context(["train_mean_state", "coordinates"], state, idx, mean, std)
+    assert static.shape == (8, 3, 4)
+    np.testing.assert_allclose(static[:6], state[idx].mean(axis=0) / 2.0, rtol=1e-5)
+    np.testing.assert_allclose(static[6, :, 0], [-1.0, 0.0, 1.0])
+    np.testing.assert_allclose(static[7, 0, [0, -1]], [-1.0, 1.0])
+    assert static_context([], state, idx, mean, std) is None
+    with pytest.raises(ValueError):
+        static_context(["bogus"], state, idx, mean, std)
+    stepper = build_stepper({"hidden_channels": 2, "hidden_layers": 1, "target_mode": "residual"}, inputs, state, idx, ["coordinates"])
+    assert stepper.net.net[0].in_channels == 9
+    assert stepper(torch.zeros(2, 6, 3, 4), torch.zeros(2, 3, 4)).shape == (2, 6, 3, 4)
+
+
+def test_run_experiment_full_saves_checkpoint(tmp_path):
+    config = write_config(tmp_path)
+    config.raw["inputs"] = {"static_fields": ["coordinates"]}
+
+    run_experiment(config)
+
+    state_dict = torch.load(tmp_path / "checkpoints" / "tiny.pt")
+    assert state_dict["static"].shape[:2] == (1, 2)

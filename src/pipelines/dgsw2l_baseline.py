@@ -64,7 +64,29 @@ def build_state_model(model_cfg: dict[str, Any], in_channels: int, out_channels:
     )
 
 
-def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarray, train_indices: np.ndarray) -> StateStepper:
+def static_context(static_fields: list[str], state: np.ndarray, train_indices: np.ndarray, input_mean: np.ndarray, input_std: np.ndarray) -> np.ndarray | None:
+    """Build normalised time-invariant input channels from the training split.
+
+    - ``train_mean_state``: time-mean of the training states, normalised like the state inputs;
+    - ``coordinates``: y and x scaled to [-1, 1].
+    """
+
+    channels: list[np.ndarray] = []
+    n_state = state.shape[1]
+    ny, nx = state.shape[2:]
+    for name in static_fields:
+        if name == "train_mean_state":
+            mean_state = state[train_indices].mean(axis=0, dtype=np.float64)
+            channels.append((mean_state - input_mean[:n_state, None, None]) / input_std[:n_state, None, None])
+        elif name == "coordinates":
+            yy, xx = np.meshgrid(np.linspace(-1.0, 1.0, ny), np.linspace(-1.0, 1.0, nx), indexing="ij")
+            channels.append(np.stack([yy, xx]))
+        else:
+            raise ValueError(f"unknown static field {name!r}")
+    return np.concatenate(channels).astype("float32") if channels else None
+
+
+def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarray, train_indices: np.ndarray, static_fields: list[str] | None = None) -> StateStepper:
     """Wrap the configured network in a physical-units stepper with the configured target."""
 
     target_mode = str(model_cfg.get("target_mode", "next_state"))
@@ -73,7 +95,9 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
         output_mean, output_std = fit_increment_normalisation(state, train_indices)
     else:
         output_mean, output_std = norm.target_mean, norm.target_std
-    net = build_state_model(model_cfg, inputs.shape[1], state.shape[1])
+    static = static_context(static_fields or [], state, train_indices, norm.input_mean, norm.input_std)
+    n_static = 0 if static is None else static.shape[0]
+    net = build_state_model(model_cfg, inputs.shape[1] + n_static, state.shape[1])
     return StateStepper(
         net,
         norm.input_mean,
@@ -82,6 +106,7 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
         output_std,
         target_mode=target_mode,
         mass_conserving=bool(model_cfg.get("mass_conserving", False)),
+        static=static,
     )
 
 
@@ -194,7 +219,8 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     dataset = RolloutWindowDataset(state, forcing, train_indices, unroll_steps)
     loader = DataLoader(dataset, batch_size=config.batch_size, shuffle=True)
     model_cfg = config.raw.get("model", {})
-    stepper = build_stepper(model_cfg, inputs, state, train_indices).to(device)
+    static_fields = [str(name) for name in config.raw.get("inputs", {}).get("static_fields", [])]
+    stepper = build_stepper(model_cfg, inputs, state, train_indices, static_fields).to(device)
     optimiser = torch.optim.Adam(stepper.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
     epochs = config.smoke_test_epochs if smoke_test else config.epochs
     rollout_steps = 3 if smoke_test else config.rollout_steps
@@ -217,6 +243,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
             "target_mode": stepper.target_mode,
             "mass_conserving": stepper.mass_conserving,
             "unroll_steps": unroll_steps,
+            "static_fields": static_fields,
             "primary_metric": "layer-thickness MSE of fully autoregressive rollout (src/evaluation.py)",
         },
         "epochs": [],
@@ -276,6 +303,10 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
         write_json_log(config.experiment_log, log)
     if last_metrics is None:  # pragma: no cover - the final epoch always triggers a rollout
         raise RuntimeError("No rollout was produced")
+    if not smoke_test:
+        checkpoint = config.results_csv.parent / "checkpoints" / f"{config.experiment_id}.pt"
+        checkpoint.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(stepper.state_dict(), checkpoint)
     append_result(config.results_csv, config.experiment_id, last_metrics[0], last_metrics[1], epochs, config.hypothesis, config.conclusion)
     return {"experiment_id": config.experiment_id, "eval_mse_mean": last_metrics[0], "eval_mse_last": last_metrics[1], "epochs_completed": epochs, "rollout_path": None if last_path is None else str(last_path), "experiment_log": str(config.experiment_log)}
 
