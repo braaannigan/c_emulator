@@ -252,3 +252,27 @@ def test_build_state_model_unet_and_unknown_type():
     assert model(torch.zeros(1, 7, 8, 8)).shape == (1, 6, 8, 8)
     with pytest.raises(ValueError):
         build_state_model({"type": "bogus"}, 7, 6)
+
+
+def test_run_experiment_with_ema_evaluates_and_saves_averaged_weights(tmp_path, monkeypatch):
+    import src.pipelines.dgsw2l_baseline as pipeline
+
+    config = write_config(tmp_path)
+    config.raw["training"]["ema_decay"] = 0.5
+    seen = {}
+    real_emulator = pipeline.StepperEmulator
+
+    def spy(stepper, device):
+        seen["stepper"] = stepper
+        return real_emulator(stepper, device)
+
+    monkeypatch.setattr(pipeline, "StepperEmulator", spy)
+    run_experiment(config)
+
+    log = json.loads(config.experiment_log.read_text())
+    assert log["metadata"]["ema_decay"] == 0.5
+    saved = torch.load(tmp_path / "checkpoints" / "tiny.pt")
+    for name, value in seen["stepper"].state_dict().items():
+        torch.testing.assert_close(saved[name], value)
+    assert not isinstance(seen["stepper"], torch.optim.swa_utils.AveragedModel)
+    assert seen["stepper"] is not None
