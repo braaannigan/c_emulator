@@ -83,3 +83,8 @@ def test_fit_increment_normalisation_and_rollout_windows():
     assert len(paired) == 4  # start 3 needs winds 3..5, the last snapshot
     _, winds = paired[3]
     np.testing.assert_allclose(winds[:, 0, 0], [3.0, 4.0, 5.0])
+    framed = RolloutWindowDataset(state, forcing, np.arange(4), unroll_steps=2, history_frames=2)
+    assert list(framed.starts) == [1, 2]  # start 0 has no previous frame in the split
+    states, winds = framed[0]
+    np.testing.assert_allclose(states[:, 0, 0, 0], [0.0, 1.0, 2.0, 3.0])
+    np.testing.assert_allclose(winds[:, 0, 0], [1.0, 2.0])

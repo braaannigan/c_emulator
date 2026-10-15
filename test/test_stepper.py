@@ -97,3 +97,33 @@ def test_emulator_rollout_uses_wind_at_step_start_and_end():
     # start = 1; steps use winds (1, 2), (2, 3), (3, 4) -> increments 3, 5, 7.
     pred = StepperEmulator(stepper, torch.device("cpu")).rollout(np.zeros((2, 6, 2, 2), dtype="float32"), forcing, 3)
     np.testing.assert_allclose(pred[:, 0, 0, 0], [3.0, 8.0, 15.0])
+
+
+class SeesTendency(torch.nn.Module):
+    """Residual net that repeats the tendency channels (after state + one wind channel)."""
+
+    def forward(self, x):
+        return x[:, 7:13]
+
+
+def two_frame(net=None):
+    return StateStepper(net or SeesTendency(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual", history_frames=2, tendency_mean=np.zeros(6), tendency_std=np.ones(6))
+
+
+def test_two_frame_stepper_validates_arguments():
+    with pytest.raises(ValueError):
+        StateStepper(AddOne(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), history_frames=3)
+    with pytest.raises(ValueError):
+        StateStepper(AddOne(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), history_frames=2)
+    with pytest.raises(ValueError):
+        two_frame()(torch.zeros(1, 6, 2, 2), torch.zeros(1, 2, 2))
+
+
+def test_two_frame_stepper_feeds_tendency_and_rolls_history_forward():
+    stepper = two_frame()
+    out = stepper(torch.full((1, 6, 2, 2), 3.0), torch.zeros(1, 2, 2), torch.full((1, 6, 2, 2), 1.0))
+    torch.testing.assert_close(out, torch.full((1, 6, 2, 2), 5.0))  # 3 + (3 - 1)
+    history = np.stack([np.full((6, 2, 2), v, dtype="float32") for v in (0.0, 1.0)])
+    # Constant-velocity extrapolation: 1 -> 2 -> 3 -> 4.
+    pred = StepperEmulator(stepper, torch.device("cpu")).rollout(history, np.zeros((5, 2, 2), dtype="float32"), 3)
+    np.testing.assert_allclose(pred[:, 0, 0, 0], [2.0, 3.0, 4.0])

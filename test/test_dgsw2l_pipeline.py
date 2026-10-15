@@ -174,9 +174,37 @@ def test_build_stepper_forcing_window_repeats_wind_normalisation():
     assert torch.isfinite(loss)
 
 
+def test_two_frame_stepper_build_and_unrolled_loss_with_noise():
+    rng = np.random.default_rng(0)
+    state = rng.normal(size=(6, 6, 3, 3)).astype("float32")
+    inputs = np.concatenate([state, np.zeros((6, 1, 3, 3), dtype="float32")], axis=1)
+    stepper = build_stepper({"hidden_channels": 2, "hidden_layers": 1, "target_mode": "residual", "history_frames": 2}, inputs, state, np.arange(4))
+    assert stepper.history_frames == 2 and stepper.net.net[0].in_channels == 13
+    np.testing.assert_allclose(stepper.tendency_std.flatten().numpy(), stepper.output_std.flatten().numpy())
+    torch.manual_seed(0)
+    states = torch.from_numpy(state[:4][None])
+    winds = torch.zeros(1, 2, 3, 3)
+    clean, noisy = unrolled_loss(stepper, states, winds), unrolled_loss(stepper, states, winds, noise_std=1.0)
+    assert torch.isfinite(clean) and float(clean) != float(noisy)
+
+
+def test_two_frame_loss_targets_follow_the_previous_frame():
+    class Zero(torch.nn.Module):
+        def forward(self, x):
+            return torch.zeros_like(x[:, :6])
+
+    from src.models.stepper import StateStepper
+
+    stepper = StateStepper(Zero(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual", history_frames=2, tendency_mean=np.zeros(6), tendency_std=np.ones(6))
+    states = torch.zeros(1, 3, 6, 2, 2)
+    states[:, 2] = 2.0
+    # Frames 0 (previous) and 1 (start); one step predicts 0 against target 2.
+    assert float(unrolled_loss(stepper, states, torch.zeros(1, 1, 2, 2))) == pytest.approx(4.0)
+
+
 def test_run_experiment_residual_mass_conserving_unrolled(tmp_path):
     config = write_config(tmp_path)
-    config.raw["model"].update({"target_mode": "residual", "mass_conserving": True, "forcing_window": 2})
+    config.raw["model"].update({"target_mode": "residual", "mass_conserving": True, "forcing_window": 2, "history_frames": 2})
     config.raw["training"]["unroll_steps"] = 2
 
     run_experiment(config, smoke_test=True)
@@ -184,6 +212,7 @@ def test_run_experiment_residual_mass_conserving_unrolled(tmp_path):
     log = json.loads(config.experiment_log.read_text())
     assert log["metadata"]["unroll_steps"] == 2
     assert log["metadata"]["forcing_window"] == 2
+    assert log["metadata"]["history_frames"] == 2
     assert log["metadata"]["target_mode"] == "residual"
     assert log["metadata"]["mass_conserving"] is True
 

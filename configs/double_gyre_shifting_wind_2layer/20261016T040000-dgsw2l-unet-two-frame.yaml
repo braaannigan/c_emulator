@@ -1,0 +1,72 @@
+experiment:
+  id: 20261016T040000-dgsw2l-unet-two-frame
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: unet-two-frame
+  kind: bigger_jump
+  rationale: 'Four follow-ups to the U-Net incumbent (long LR decay, 16-step unroll, depth
+    4, end-of-step wind) failed to beat it beyond the +/-20 checkpoint noise. All of them
+    still give the network a single snapshot, yet at 7-day sampling the same thickness field
+    is consistent with eddies moving in different directions: propagation direction and speed
+    are not observable from one frame. Feeding the latest tendency (state minus previous state)
+    changes the state representation to a two-frame (second-order-in-time) one, as in many
+    weather emulators, and should mainly cut step-1 to step-20 error, extending how long the
+    free run tracks the true eddies. Run as three seeds in parallel on RunPod to beat the
+    checkpoint noise.'
+  hypothesis: Adding the previous-step tendency as input channels (history_frames=2) to the
+    incumbent U-Net recipe lowers step-1/5/10/20 lead MSE and, averaged over seeds 42/7/123,
+    gives a final eval_mse_mean below the incumbent's two-seed mean of 151.9 and an epochs
+    30-60 average below ~166, while staying bounded with KE and h-std ratios above 0.9.
+  conclusion: null
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261016T040000-dgsw2l-unet-two-frame.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+model:
+  type: unet
+  hidden_channels: 32
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+  depth: 3
+  history_frames: 2
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '

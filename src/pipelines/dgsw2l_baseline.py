@@ -116,8 +116,9 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
 
     target_mode = str(model_cfg.get("target_mode", "next_state"))
     norm = fit_channel_normalisation(inputs, state, train_indices)
+    increment_mean, increment_std = fit_increment_normalisation(state, train_indices)
     if target_mode == "residual":
-        output_mean, output_std = fit_increment_normalisation(state, train_indices)
+        output_mean, output_std = increment_mean, increment_std
     else:
         output_mean, output_std = norm.target_mean, norm.target_std
     static = static_context(static_fields or [], state, train_indices, norm.input_mean, norm.input_std)
@@ -127,7 +128,9 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
     n_state = state.shape[1]
     input_mean = np.concatenate([norm.input_mean[:n_state], np.repeat(norm.input_mean[n_state:], forcing_window)])
     input_std = np.concatenate([norm.input_std[:n_state], np.repeat(norm.input_std[n_state:], forcing_window)])
-    net = build_state_model(model_cfg, n_state + forcing_window + n_static, state.shape[1])
+    history_frames = int(model_cfg.get("history_frames", 1))
+    n_tendency = n_state if history_frames == 2 else 0
+    net = build_state_model(model_cfg, n_state + forcing_window + n_tendency + n_static, state.shape[1])
     return StateStepper(
         net,
         input_mean,
@@ -140,29 +143,41 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
         fixed_mask=fixed_mask,
         fixed_values=fixed_values,
         forcing_window=forcing_window,
+        history_frames=history_frames,
+        tendency_mean=increment_mean,
+        tendency_std=increment_std,
     )
 
 
 def unrolled_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tensor, noise_std: float = 0.0) -> torch.Tensor:
     """Mean over unrolled steps of the MSE in output-normalised units.
 
+    With ``history_frames=2`` the window's first state is the previous frame.
+
     ``noise_std`` > 0 perturbs the window's start state with white noise of
     ``noise_std`` output-std units on wet cells, while the targets stay the
     true states, so the model learns to damp its own small-scale errors.
     """
 
-    current = states[:, 0]
+    first = stepper.history_frames - 1
+    current = states[:, first]
+    previous = states[:, 0] if first else None
     if noise_std > 0:
         noise = torch.randn_like(current) * stepper.output_std * noise_std
         if stepper.fixed_mask.numel():
             noise = noise.masked_fill(stepper.fixed_mask, 0.0)
+        # The same perturbation on both frames mimics accumulated rollout
+        # error, which is shared by consecutive states; the tendency stays clean.
         current = current + noise
+        previous = None if previous is None else previous + noise
     window = stepper.forcing_window
     steps = winds.shape[1] - window + 1
     loss = states.new_zeros(())
     for k in range(steps):
-        current = stepper(current, winds[:, k : k + window])
-        loss = loss + (((current - states[:, k + 1]) / stepper.output_std) ** 2).mean()
+        nxt = stepper(current, winds[:, k : k + window], previous)
+        previous = current if first else None
+        current = nxt
+        loss = loss + (((current - states[:, first + k + 1]) / stepper.output_std) ** 2).mean()
     return loss / steps
 
 
@@ -263,7 +278,8 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     unroll_steps = int(config.raw.get("training", {}).get("unroll_steps", 1))
     noise_std = float(config.raw.get("training", {}).get("input_noise_std", 0.0))
     forcing_window = int(config.raw.get("model", {}).get("forcing_window", 1))
-    dataset = RolloutWindowDataset(state, forcing, train_indices, unroll_steps, forcing_window)
+    history_frames = int(config.raw.get("model", {}).get("history_frames", 1))
+    dataset = RolloutWindowDataset(state, forcing, train_indices, unroll_steps, forcing_window, history_frames)
     loader = DataLoader(dataset, batch_size=config.batch_size, shuffle=True)
     model_cfg = config.raw.get("model", {})
     static_fields = [str(name) for name in config.raw.get("inputs", {}).get("static_fields", [])]
@@ -291,6 +307,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
             "mass_conserving": stepper.mass_conserving,
             "unroll_steps": unroll_steps,
             "forcing_window": forcing_window,
+            "history_frames": history_frames,
             "input_noise_std": noise_std,
             "static_fields": static_fields,
             "fixed_land_cells": bool(stepper.fixed_mask.numel()),
