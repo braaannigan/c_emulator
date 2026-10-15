@@ -14,6 +14,7 @@ from src.viewer.training_metrics_viewer import (
     log_updated_at,
     load_experiment_log,
     epoch_timing_figure,
+    MAX_PLOT_Y,
     overview_eval_mean_mse_figure,
     records_by_family,
     rollout_metrics_figure,
@@ -201,6 +202,25 @@ def test_overview_eval_mean_mse_figure_plots_final_eval_mse_by_experiment_index(
     assert list(figure.data[0].x) == [1, 2, 3]
     assert list(figure.data[0].y) == [3.0, 4.0, 1.0]
     assert list(figure.data[0].marker.color) == ["red", "#2563eb", "red"]
+
+
+def test_overview_eval_mean_mse_figure_pins_off_scale_runs_to_axis_top(tmp_path):
+    # Diverged runs (e.g. 3e27) must not be sent as y coordinates: some browsers
+    # (Safari) then fail to draw every marker in the trace while hover still works.
+    values = {"exp1": [1e27, 3e27], "exp2": [float("inf"), 1.0], "exp3": [100.0, 200.0]}
+    records = []
+    for timestamp, (experiment_id, series) in enumerate(values.items(), start=1):
+        log_path = tmp_path / "family" / "logs" / f"{experiment_id}.json"
+        write_log(log_path, experiment_id=experiment_id, rollouts=[{"epoch": 5, "eval_mse_by_time": series}])
+        records.append(TrainingRunRecord("family", experiment_id, log_path, float(timestamp)))
+
+    trace = overview_eval_mean_mse_figure(records).data[0]
+
+    assert list(trace.y) == [MAX_PLOT_Y, MAX_PLOT_Y, 150.0]
+    assert list(trace.marker.symbol) == ["triangle-up", "triangle-up", "circle"]
+    assert "2e+27" in trace.hovertext[0] and "off scale" in trace.hovertext[0]
+    assert "inf" in trace.hovertext[1]
+    assert trace.marker.line.width > 0
 
 
 def test_overview_eval_mean_mse_figure_skips_records_without_valid_rollouts(tmp_path):

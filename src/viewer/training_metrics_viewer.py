@@ -333,7 +333,13 @@ def surface_thickness_rms_figure(log: dict[str, Any]) -> go.Figure:
 
 
 def overview_eval_mean_mse_figure(records: list[TrainingRunRecord]) -> go.Figure:
-    """Scatter final eval MSE against experiment index."""
+    """Scatter final eval MSE against experiment index.
+
+    Runs above ``MAX_PLOT_Y`` (or non-finite) are drawn as triangles pinned to
+    the top of the axis, with the true value in the hover text. Sending huge
+    values (diverged runs reach ~1e27) as y coordinates makes some browsers
+    (Safari) skip drawing every marker in the trace.
+    """
 
     sorted_records = sorted(records, key=lambda item: (item.updated_at, item.experiment_id))
     x_values: list[int] = []
@@ -341,6 +347,7 @@ def overview_eval_mean_mse_figure(records: list[TrainingRunRecord]) -> go.Figure
     hover_text: list[str] = []
     labels: list[str] = []
     marker_colours: list[str] = []
+    marker_symbols: list[str] = []
     best_so_far = float("inf")
     for index, record in enumerate(sorted_records, start=1):
         log = load_experiment_log(record)
@@ -357,13 +364,15 @@ def overview_eval_mean_mse_figure(records: list[TrainingRunRecord]) -> go.Figure
         is_new_best = final_eval_mse < best_so_far
         if is_new_best:
             best_so_far = final_eval_mse
+        off_scale = not np.isfinite(final_eval_mse) or final_eval_mse > MAX_PLOT_Y
         x_values.append(index)
-        y_values.append(final_eval_mse)
+        y_values.append(MAX_PLOT_Y if off_scale else final_eval_mse)
+        marker_symbols.append("triangle-up" if off_scale else "circle")
         labels.append(record.experiment_id)
         marker_colours.append("red" if is_new_best else "#2563eb")
         hover_text.append(
             f"index: {index}<br>family: {record.experiment_family}<br>experiment: {record.experiment_id}"
-            f"<br>final eval MSE: {final_eval_mse:.6g}<br>new best incumbent: {is_new_best}"
+            f"<br>final eval MSE: {final_eval_mse:.6g}{' (off scale)' if off_scale else ''}<br>new best incumbent: {is_new_best}"
         )
 
     figure = go.Figure(
@@ -375,7 +384,8 @@ def overview_eval_mean_mse_figure(records: list[TrainingRunRecord]) -> go.Figure
                 text=labels,
                 hovertext=hover_text,
                 hoverinfo="text",
-                marker={"size": 11, "color": marker_colours},
+                marker={"size": 11, "color": marker_colours, "symbol": marker_symbols, "line": {"width": 1, "color": "white"}},
+                cliponaxis=False,
                 name="final_eval_mse",
             )
         ]
