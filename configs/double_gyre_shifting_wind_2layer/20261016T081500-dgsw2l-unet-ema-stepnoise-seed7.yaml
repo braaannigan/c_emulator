@@ -9,7 +9,7 @@ experiment:
     unrolled step, on top of the EMA incumbent, lowers the 3-seed epochs 30-60 average below
     151.5 and the 3-seed final below 147.0 by more than ~10, with KE and h-std ratios staying
     above 0.9 (some extra smoothing expected).
-  conclusion: null
+  conclusion: Seed replica; see 20261016T081500-dgsw2l-unet-ema-stepnoise.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

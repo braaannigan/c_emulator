@@ -15,7 +15,13 @@ experiment:
     unrolled step, on top of the EMA incumbent, lowers the 3-seed epochs 30-60 average below
     151.5 and the 3-seed final below 147.0 by more than ~10, with KE and h-std ratios staying
     above 0.9 (some extra smoothing expected).
-  conclusion: null
+  conclusion: Rejected (neutral to slightly worse). Adding 0.5 increment-std noise to the
+    model's own prediction before every later unrolled step gives 3-seed finals 147.5 / 153.7
+    / 154.8 (mean 152.0) and epochs 30-60 averages 164.0 / 149.7 / 159.4 (mean 157.7) vs the
+    EMA incumbent's 147.0 / 151.5, within the ~10-point standard error and in the wrong direction.
+    Short-lead skill and fidelity are unchanged (step-1 0.8-0.9, KE 0.93-0.94, h-std 0.98-0.99).
+    Start-of-window noise already teaches the needed damping; extra in-window noise only adds
+    training noise. Neither regularisation nor horizon changes move the chaotic tail.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
