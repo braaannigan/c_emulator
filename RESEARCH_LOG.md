@@ -2,8 +2,22 @@
 
 ## Current incumbent
 
-`20261015T120000-dgsw2l-baseline-state-cnn` (reference only — unstable,
-final eval_mse_mean 1.97e5). Any stable model beats it.
+`20261015T191000-dgsw2l-noise-injection` (seed check:
+`20261015T200500-dgsw2l-noise-injection-seed7`). First stable emulator.
+
+- Recipe: 3-hidden-layer 32-ch CNN, residual (increment) target, exact
+  per-layer volume conservation over wet cells, land ring pinned, static
+  inputs (train-mean state, coordinates, land mask), 8-step unrolled MSE,
+  white input noise of 1 increment-std on each window start, Adam 3e-4,
+  clip 1.0, 60 epochs.
+- Final rollout: eval_mse_mean 215.7 / last 393.6 / vel 0.00258 (seed 7:
+  209.3 / 307.6 / 0.00247). All 12 scheduled rollouts bounded (155-261).
+- Variance-preserving (h-std ratio ~1.0, KE ratio ~0.78). Beats persistence
+  (297.7); does not beat climatology (136.8). Error saturates near 2x
+  climate variance after ~30 steps, which is what a faithful free-running
+  emulator of a chaotic flow should do.
+- Full rollout: `data/double_gyre_shifting_wind_2layer/rollout/20261015T191000-dgsw2l-noise-injection-final-epoch0060.nc`;
+  checkpoint in `data/double_gyre_shifting_wind_2layer/checkpoints/`.
 
 ## Reference scores (same evaluator window, 143 steps, no learning)
 
@@ -61,3 +75,8 @@ persistence). Track both MSE and variance/KE diagnostics.
 - Hypothesis: Adding white noise (1 increment-std per channel, wet cells only) to the start state of every 8-step training window, with clean true targets, teaches the land-mask CNN to damp grid-scale errors and keeps its 143-step rollouts bounded at every scheduled checkpoint, with eval_mse_mean below climatology (136.8).
 - Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 154.9 / 263.9 / 0.002116 (std 0.94, KE 0.71); 10: 189.7 / 332.7 / 0.002094 (std 0.97, KE 0.68); 15: 226.6 / 401.7 / 0.002279 (std 0.99, KE 0.75); 20: 220.3 / 360.8 / 0.002348 (std 1.03, KE 0.76); 25: 261.2 / 426.8 / 0.002413 (std 0.92, KE 0.76); 30: 201.4 / 315.7 / 0.002536 (std 0.97, KE 0.82); 35: 194 / 288.2 / 0.002549 (std 0.97, KE 0.74); 40: 211.7 / 356.4 / 0.002605 (std 0.95, KE 0.74); 45: 209 / 317.8 / 0.002457 (std 0.98, KE 0.79); 50: 230.7 / 386.4 / 0.002537 (std 1.04, KE 0.86); 55: 246.8 / 364.3 / 0.002879 (std 1.00, KE 0.87); 60: 215.7 / 393.6 / 0.002584 (std 1.03, KE 0.78)
 - Conclusion: Supported: first stable emulator. Noise injection (1 increment-std white noise on wet cells of each window's start state) on top of the land-mask recipe keeps all 12 scheduled 143-step rollouts bounded (eval_mse_mean 155-261, final 215.7 / last 393.6 / vel 0.00258), beating persistence (297.7) at every checkpoint, with physically consistent variance (h-std ratio 0.92-1.04, KE ratio 0.68-0.87, no late-lead growth). It does not beat climatology (136.8): it behaves as a variance-preserving free-running model whose error saturates near 2x climate variance after ~30 steps (~200-300), as anticipated by the predictability diagnostics. Short-lead skill is preserved (step-1 7.8, step-5 54, step-10 60). Candidate incumbent pending seed check.
+
+### 20261015T200500-dgsw2l-noise-injection-seed7 — tuning
+- Hypothesis: The noise-injection recipe is seed-robust: with seed 7 all scheduled rollouts stay bounded and the final eval_mse_mean is within ~20% of seed 42 (215.7).
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 155.3 / 232.4 / 0.002142 (std 0.90, KE 0.73); 10: 192.8 / 419.9 / 0.002256 (std 0.90, KE 0.72); 15: 193.1 / 264 / 0.002219 (std 1.01, KE 0.69); 20: 182.5 / 277.8 / 0.002228 (std 0.96, KE 0.75); 25: 218.2 / 404.5 / 0.00243 (std 0.99, KE 0.74); 30: 199.4 / 319.7 / 0.002348 (std 1.01, KE 0.74); 35: 187.6 / 272.6 / 0.002359 (std 0.99, KE 0.72); 40: 202.7 / 352.9 / 0.002405 (std 0.99, KE 0.73); 45: 233.7 / 374.1 / 0.002315 (std 1.02, KE 0.74); 50: 224.6 / 384 / 0.002363 (std 1.04, KE 0.72); 55: 225.3 / 348.4 / 0.002254 (std 1.09, KE 0.80); 60: 209.3 / 307.6 / 0.002471 (std 1.01, KE 0.89)
+- Conclusion: Seed check passed. Seed 7 keeps all 12 scheduled rollouts bounded (155-234), final 209.3 / last 307.6 / vel 0.00247 vs seed 42's 215.7 / 393.6 / 0.00258, with matching variance diagnostics (h-std ratio 0.90-1.09, KE 0.69-0.89). The noise-injection recipe is promoted to incumbent (seed-42 run as the reference; two-seed final mean 212.5).
