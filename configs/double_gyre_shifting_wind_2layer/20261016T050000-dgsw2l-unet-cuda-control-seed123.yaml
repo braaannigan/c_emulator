@@ -12,7 +12,7 @@ experiment:
     of local MPS, scores within the +/-20 checkpoint noise of its MPS runs (155.8 / 148.0),
     giving a like-for-like CUDA baseline and a three-seed spread for judging later remote
     experiments.
-  conclusion: null
+  conclusion: Seed replica; see 20261016T050000-dgsw2l-unet-cuda-control.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

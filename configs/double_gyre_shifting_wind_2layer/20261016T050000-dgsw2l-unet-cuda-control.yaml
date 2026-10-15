@@ -12,7 +12,14 @@ experiment:
     of local MPS, scores within the +/-20 checkpoint noise of its MPS runs (155.8 / 148.0),
     giving a like-for-like CUDA baseline and a three-seed spread for judging later remote
     experiments.
-  conclusion: null
+  conclusion: 'Control established. The unchanged incumbent recipe on RunPod CUDA (RTX 4090,
+    5-6 min per run plus ~40 s queue) gives final eval_mse_mean 128.9 / 168.1 / 149.7 (seeds
+    42/7/123; mean 148.9, spread +/-20) and epochs 30-60 averages 170.2 / 162.8 / 168.4 (mean
+    167.1), consistent with the MPS runs (155.8 / 148.0; ~166). Backend does not shift scores
+    beyond seed noise. Reference for remote experiments: 3-seed final mean 148.9 and 3-seed
+    epochs 30-60 mean 167.1; a candidate needs to beat both by more than the ~10-point standard
+    error of a 3-seed mean. Against this control the two-frame model (177.6 / 183.2) is confirmed
+    worse.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
