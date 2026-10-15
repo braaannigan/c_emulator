@@ -22,3 +22,17 @@ def test_unet_receptive_field_spans_coarse_scales():
 def test_unet_rejects_zero_depth():
     with pytest.raises(ValueError):
         StateUNet(1, 1, depth=0)
+
+
+@pytest.mark.parametrize("shape", [(16, 8), (25, 13)])
+def test_convnext_unet_preserves_shape_and_uses_convnext_layers(shape):
+    from src.models.unet import ConvNeXtLayer
+
+    model = StateUNet(9, 6, base_channels=4, depth=2, block="convnext")
+    assert model(torch.zeros(2, 9, *shape)).shape == (2, 6, *shape)
+    assert sum(isinstance(m, ConvNeXtLayer) for m in model.modules()) == 2 * (2 * 2 + 1)
+
+
+def test_unet_rejects_unknown_block():
+    with pytest.raises(ValueError):
+        StateUNet(1, 1, block="bogus")
