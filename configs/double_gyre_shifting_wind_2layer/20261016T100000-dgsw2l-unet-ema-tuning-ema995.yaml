@@ -9,7 +9,10 @@ experiment:
     tests the other side of the optimum.
   hypothesis: EMA decay 0.995 lowers the 3-seed epochs 30-60 average below 151.5 and the 3-seed
     final below 147.0 by more than ~10 with KE and h-std ratios above 0.9.
-  conclusion: null
+  conclusion: 'Neutral, not adopted. EMA decay 0.995 (~3-epoch horizon) gives 3-seed finals
+    144.2 / 151.8 / 135.2 (mean 143.7) and epochs 30-60 averages 152.2 / 157.6 / 160.8 (mean
+    156.9) vs 0.998''s 147.0 / 151.5: within noise either way. With 0.9995 over-smoothing,
+    the useful range is ~0.995-0.998; keep 0.998.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

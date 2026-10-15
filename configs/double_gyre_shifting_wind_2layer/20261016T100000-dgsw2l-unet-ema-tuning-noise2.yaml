@@ -10,7 +10,11 @@ experiment:
   hypothesis: Input noise 2.0 with EMA lowers the 3-seed epochs 30-60 average below 151.5
     and the 3-seed final below 147.0 by more than ~10, keeping KE above 0.85 and h-std above
     0.9.
-  conclusion: null
+  conclusion: Rejected. Doubling start-of-window input noise to 2.0 increment-std (with EMA)
+    gives 3-seed finals 161.0 / 174.8 / 146.0 (mean 160.6) and epochs 30-60 averages 166.4
+    / 165.1 / 154.0 (mean 161.8) vs 147.0 / 151.5, with slightly worse step-1 (0.9-1.1 vs
+    0.8) and velocity MSE (0.0023 vs 0.0021). Stronger damping does not slow mid-lead error
+    growth. Keep 1.0.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
