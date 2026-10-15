@@ -74,3 +74,37 @@ def test_fixed_cells_without_mass_projection_and_argument_pairing():
     assert float(out[0, 0, 0, 0]) == 5.0 and float(out[0, 0, 1, 1]) == 1.0
     with pytest.raises(ValueError):
         StateStepper(AddOne(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), fixed_mask=mask)
+
+
+class Zero(torch.nn.Module):
+    def forward(self, x):
+        return torch.zeros_like(x[:, :6])
+
+
+def nudged(rate=0.5, pool=2, climate=None, **kwargs):
+    climate = np.zeros((6, 4, 4), dtype="float32") if climate is None else climate
+    return StateStepper(Zero(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual", nudge_rate=rate, nudge_pool=pool, climate=climate, **kwargs)
+
+
+def test_nudging_validates_arguments():
+    for kwargs in [{"nudge_rate": -0.1}, {"nudge_rate": 0.1}, {"nudge_rate": 0.1, "nudge_pool": 0, "climate": np.zeros((6, 2, 2))}]:
+        with pytest.raises(ValueError):
+            StateStepper(Zero(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), **kwargs)
+
+
+def test_nudging_relaxes_large_scale_anomaly_and_leaves_eddies():
+    stepper = nudged(rate=0.5, pool=2)
+    uniform = torch.full((1, 6, 4, 4), 4.0)
+    torch.testing.assert_close(stepper(uniform, torch.zeros(1, 4, 4)), torch.full((1, 6, 4, 4), 2.0))
+    checker = torch.tensor([[1.0, -1.0], [-1.0, 1.0]]).repeat(2, 2).expand(1, 6, 4, 4).contiguous()
+    # A grid-scale checkerboard averages to zero in every 2x2 block, so it is untouched.
+    torch.testing.assert_close(stepper(checker, torch.zeros(1, 4, 4)), checker)
+
+
+def test_nudging_keeps_volume_conservation():
+    torch.manual_seed(0)
+    stepper = nudged(rate=0.3, pool=2, mass_conserving=True)
+    state = torch.randn(2, 6, 4, 4) + torch.linspace(0, 3, 4)
+    out = stepper(state, torch.zeros(2, 4, 4))
+    torch.testing.assert_close(out[:, :2].mean(dim=(2, 3)), state[:, :2].mean(dim=(2, 3)))
+    assert not torch.allclose(out, state)

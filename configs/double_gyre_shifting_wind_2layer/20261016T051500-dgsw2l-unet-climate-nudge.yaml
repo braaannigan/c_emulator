@@ -1,0 +1,73 @@
+experiment:
+  id: 20261016T051500-dgsw2l-unet-climate-nudge
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: unet-climate-nudge
+  kind: bigger_jump
+  rationale: A bias/variance decomposition of the incumbent's final rollout shows MSE 155.8
+    = bias^2 16.1 + var_truth 125.2 + var_model 104.5 - 2cov 90.0, with the time-mean bias
+    growing to 26 after step 50, larger than the training-mean climatology's own bias (11.6
+    / 17.7). The free run drifts in its large-scale (gyre/separation) mean state, which no
+    amount of short-lead skill fixes. Spectral-nudging-style relaxation of only the large-scale
+    anomaly toward the training-mean state (block average over 20 cells, i.e. 10x5 coarse
+    grid) is a physical-formulation change that corrects climate drift while leaving the eddy
+    field free, uses only training data, and keeps land pinning and volume conservation.
+  hypothesis: Relaxing the 20-cell-block large-scale anomaly toward the training-mean state
+    at 5% per step (with 2% and 15% arms) reduces the rollout's time-mean bias^2 and tail
+    error, giving a final eval_mse_mean below the incumbent's CUDA control and an epochs 30-60
+    average below ~166, while short-lead error and the eddy-scale KE/h-std ratios (> 0.9)
+    are essentially unchanged.
+  conclusion: null
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261016T051500-dgsw2l-unet-climate-nudge.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+model:
+  type: unet
+  hidden_channels: 32
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+  depth: 3
+  nudge_rate: 0.05
+  nudge_pool: 20
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '

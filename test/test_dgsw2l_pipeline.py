@@ -161,15 +161,27 @@ def test_run_experiment_full_saves_rollout_netcdf_when_enabled(tmp_path):
         assert "rollout_meridional_velocity_centered" in ds
 
 
+def test_build_stepper_nudging_uses_training_mean_climate():
+    rng = np.random.default_rng(0)
+    state = rng.normal(size=(6, 6, 4, 4)).astype("float32")
+    inputs = np.concatenate([state, np.zeros((6, 1, 4, 4), dtype="float32")], axis=1)
+    stepper = build_stepper({"hidden_channels": 2, "hidden_layers": 1, "target_mode": "residual", "nudge_rate": 0.1, "nudge_pool": 2}, inputs, state, np.arange(4))
+    assert stepper.nudge_rate == 0.1 and stepper.nudge_pool == 2
+    np.testing.assert_allclose(stepper.climate[0].numpy(), state[:4].mean(axis=0), rtol=1e-5)
+    plain = build_stepper({"hidden_channels": 2, "hidden_layers": 1}, inputs, state, np.arange(4))
+    assert plain.nudge_rate == 0.0 and plain.climate.numel() == 0
+
+
 def test_run_experiment_residual_mass_conserving_unrolled(tmp_path):
     config = write_config(tmp_path)
-    config.raw["model"].update({"target_mode": "residual", "mass_conserving": True})
+    config.raw["model"].update({"target_mode": "residual", "mass_conserving": True, "nudge_rate": 0.05, "nudge_pool": 2})
     config.raw["training"]["unroll_steps"] = 2
 
     run_experiment(config, smoke_test=True)
 
     log = json.loads(config.experiment_log.read_text())
     assert log["metadata"]["unroll_steps"] == 2
+    assert log["metadata"]["nudge_rate"] == 0.05
     assert log["metadata"]["target_mode"] == "residual"
     assert log["metadata"]["mass_conserving"] is True
 

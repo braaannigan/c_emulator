@@ -135,6 +135,9 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
         static=static,
         fixed_mask=fixed_mask,
         fixed_values=fixed_values,
+        nudge_rate=float(model_cfg.get("nudge_rate", 0.0)),
+        nudge_pool=int(model_cfg.get("nudge_pool", 20)),
+        climate=state[train_indices].mean(axis=0) if float(model_cfg.get("nudge_rate", 0.0)) > 0 else None,
     )
 
 
@@ -283,6 +286,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
             "target_mode": stepper.target_mode,
             "mass_conserving": stepper.mass_conserving,
             "unroll_steps": unroll_steps,
+            "nudge_rate": float(model_cfg.get("nudge_rate", 0.0)),
             "input_noise_std": noise_std,
             "static_fields": static_fields,
             "fixed_land_cells": bool(stepper.fixed_mask.numel()),
