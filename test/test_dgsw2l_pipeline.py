@@ -242,3 +242,13 @@ def test_run_experiment_logs_noise_std(tmp_path):
     run_experiment(config, smoke_test=True)
 
     assert json.loads(config.experiment_log.read_text())["metadata"]["input_noise_std"] == 0.5
+
+
+def test_build_state_model_unet_and_unknown_type():
+    from src.models.unet import StateUNet
+
+    model = build_state_model({"type": "unet", "hidden_channels": 4, "depth": 2}, 7, 6)
+    assert isinstance(model, StateUNet)
+    assert model(torch.zeros(1, 7, 8, 8)).shape == (1, 6, 8, 8)
+    with pytest.raises(ValueError):
+        build_state_model({"type": "bogus"}, 7, 6)

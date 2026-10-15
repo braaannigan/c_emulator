@@ -2,22 +2,27 @@
 
 ## Current incumbent
 
-`20261015T191000-dgsw2l-noise-injection` (seed check:
-`20261015T200500-dgsw2l-noise-injection-seed7`). First stable emulator.
+`20261015T204500-dgsw2l-unet-multiscale` (seed check:
+`20261015T220000-dgsw2l-unet-multiscale-seed7`).
 
-- Recipe: 3-hidden-layer 32-ch CNN, residual (increment) target, exact
-  per-layer volume conservation over wet cells, land ring pinned, static
-  inputs (train-mean state, coordinates, land mask), 8-step unrolled MSE,
-  white input noise of 1 increment-std on each window start, Adam 3e-4,
-  clip 1.0, 60 epochs.
-- Final rollout: eval_mse_mean 215.7 / last 393.6 / vel 0.00258 (seed 7:
-  209.3 / 307.6 / 0.00247). All 12 scheduled rollouts bounded (155-261).
-- Variance-preserving (h-std ratio ~1.0, KE ratio ~0.78). Beats persistence
-  (297.7); does not beat climatology (136.8). Error saturates near 2x
-  climate variance after ~30 steps, which is what a faithful free-running
-  emulator of a chaotic flow should do.
-- Full rollout: `data/double_gyre_shifting_wind_2layer/rollout/20261015T191000-dgsw2l-noise-injection-final-epoch0060.nc`;
+- Recipe: 3-level U-Net (32/64/128/256 ch, 2x avg-pool), residual
+  (increment) target, exact per-layer volume conservation over wet cells,
+  land ring pinned, static inputs (train-mean state, coordinates, land
+  mask), 8-step unrolled MSE, white input noise of 1 increment-std on each
+  window start, Adam 3e-4, clip 1.0, 60 epochs.
+- Final rollout: eval_mse_mean 155.8 / last 332.5 / vel 0.00228 (seed 7:
+  148.0 / 342.8 / 0.00183). All 12 scheduled rollouts bounded for both seeds;
+  epochs 30-60 average ~167.
+- Lead-time thickness MSE: step-1 0.9, step-5 11, step-10 19.5, step-20 24.7
+  (previous incumbent: 7.8 / 54 / 60 / 99).
+- Variance-preserving (h-std ratio ~0.97, KE ratio ~0.95). Beats persistence
+  (297.7); not yet climatology (136.8). The long-lead tail still saturates
+  near 2x climate variance, as expected for a faithful free-running model of
+  a chaotic flow.
+- Full rollout: `data/double_gyre_shifting_wind_2layer/rollout/20261015T204500-dgsw2l-unet-multiscale-final-epoch0060.nc`;
   checkpoint in `data/double_gyre_shifting_wind_2layer/checkpoints/`.
+
+Previous incumbent: `20261015T191000-dgsw2l-noise-injection` (CNN, 215.7).
 
 ## Reference scores (same evaluator window, 143 steps, no learning)
 
@@ -80,3 +85,13 @@ persistence). Track both MSE and variance/KE diagnostics.
 - Hypothesis: The noise-injection recipe is seed-robust: with seed 7 all scheduled rollouts stay bounded and the final eval_mse_mean is within ~20% of seed 42 (215.7).
 - Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 155.3 / 232.4 / 0.002142 (std 0.90, KE 0.73); 10: 192.8 / 419.9 / 0.002256 (std 0.90, KE 0.72); 15: 193.1 / 264 / 0.002219 (std 1.01, KE 0.69); 20: 182.5 / 277.8 / 0.002228 (std 0.96, KE 0.75); 25: 218.2 / 404.5 / 0.00243 (std 0.99, KE 0.74); 30: 199.4 / 319.7 / 0.002348 (std 1.01, KE 0.74); 35: 187.6 / 272.6 / 0.002359 (std 0.99, KE 0.72); 40: 202.7 / 352.9 / 0.002405 (std 0.99, KE 0.73); 45: 233.7 / 374.1 / 0.002315 (std 1.02, KE 0.74); 50: 224.6 / 384 / 0.002363 (std 1.04, KE 0.72); 55: 225.3 / 348.4 / 0.002254 (std 1.09, KE 0.80); 60: 209.3 / 307.6 / 0.002471 (std 1.01, KE 0.89)
 - Conclusion: Seed check passed. Seed 7 keeps all 12 scheduled rollouts bounded (155-234), final 209.3 / last 307.6 / vel 0.00247 vs seed 42's 215.7 / 393.6 / 0.00258, with matching variance diagnostics (h-std ratio 0.90-1.09, KE 0.69-0.89). The noise-injection recipe is promoted to incumbent (seed-42 run as the reference; two-seed final mean 212.5).
+
+### 20261015T204500-dgsw2l-unet-multiscale — bigger_jump
+- Hypothesis: Replacing the local CNN with a 3-level U-Net (32/64/128/256 channels, 2x average pooling per level, receptive field covering ~70+ cells) inside the same stable recipe (residual, volume projection, pinned land, static context, 8-step unroll, noise injection) markedly improves short- and mid-lead skill (step-1 and step-10 MSE) while staying bounded at every scheduled rollout, lowering final eval_mse_mean below the incumbent's 215.7.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 318.9 / 547.9 / 0.003673 (std 0.92, KE 0.93); 10: 204.3 / 314 / 0.002311 (std 0.94, KE 0.93); 15: 183.5 / 338.4 / 0.002739 (std 0.98, KE 0.94); 20: 208.2 / 218.8 / 0.003067 (std 0.99, KE 0.93); 25: 198.4 / 477 / 0.002307 (std 0.93, KE 0.93); 30: 151.6 / 311.8 / 0.002039 (std 0.95, KE 0.98); 35: 165.3 / 240.4 / 0.002057 (std 0.98, KE 0.93); 40: 186.8 / 445.5 / 0.002912 (std 0.96, KE 0.95); 45: 137.5 / 222.9 / 0.00196 (std 0.96, KE 0.94); 50: 186 / 383.8 / 0.0025 (std 0.99, KE 0.97); 55: 177.4 / 359.6 / 0.002297 (std 0.98, KE 0.91); 60: 155.8 / 332.5 / 0.002283 (std 0.97, KE 0.97)
+- Conclusion: Supported: large gain in predictive skill, candidate incumbent pending seed check. The 3-level U-Net inside the incumbent recipe stays bounded in all 12 scheduled rollouts and cuts lead-time error several-fold: step-1 0.9 (vs 7.8), step-5 11 (vs 54), step-10 19.5 (vs 60), step-20 24.7 (vs 99). Final eval_mse_mean 155.8 / last 332.5 / vel 0.00228 vs 215.7 / 393.6 / 0.00258; mean over epochs 30-60 is 166 vs ~215 for the incumbent, so the gain is consistent, not one lucky checkpoint. Physical fidelity also improves (KE ratio 0.91-0.98 vs ~0.78; h-std ratio 0.93-0.99). Long-lead error still saturates near 2x climate variance after ~50 steps, so eval_mse_mean is now dominated by the chaotic tail; the epoch-to-epoch spread (138-208) reflects which eddy realisation the free run lands on. Training loss is still falling (0.63), so longer training may help further.
+
+### 20261015T220000-dgsw2l-unet-multiscale-seed7 — tuning
+- Hypothesis: The U-Net recipe is seed-robust: with seed 7 all scheduled rollouts stay bounded, short-lead skill matches seed 42 (step-1 ~1, step-10 ~20), and the final eval_mse_mean is below the incumbent's 215.7.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 229 / 525.6 / 0.002734 (std 1.01, KE 0.74); 10: 206.1 / 376.2 / 0.00233 (std 1.00, KE 1.02); 15: 223.7 / 328.1 / 0.002547 (std 1.04, KE 0.98); 20: 222.7 / 284.3 / 0.002886 (std 0.98, KE 0.90); 25: 210.8 / 331.5 / 0.002749 (std 0.98, KE 0.91); 30: 184.4 / 417.9 / 0.002346 (std 0.97, KE 0.91); 35: 173.3 / 383.2 / 0.00201 (std 0.95, KE 0.98); 40: 171.1 / 282.8 / 0.001746 (std 0.99, KE 1.00); 45: 178.3 / 431.8 / 0.002223 (std 0.99, KE 0.93); 50: 155.7 / 391.1 / 0.002251 (std 0.99, KE 0.97); 55: 160.1 / 449.9 / 0.001962 (std 0.96, KE 0.92); 60: 148 / 342.8 / 0.001831 (std 1.00, KE 1.00)
+- Conclusion: Seed check passed. Seed 7 stays bounded in all 12 scheduled rollouts, reproduces the short-lead skill (step-1 0.8, step-10 14.9, step-20 24.7) and ends at 148.0 / 342.8 / vel 0.00183 vs seed 42's 155.8 / 332.5 / 0.00228; epochs 30-60 average ~167 for both seeds. The U-Net recipe is promoted to incumbent (seed-42 run as the reference; two-seed final mean 151.9, vs 212.5 for the previous incumbent).
