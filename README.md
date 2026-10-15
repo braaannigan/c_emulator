@@ -34,7 +34,7 @@ behaviour of the original model.
 ## The system being emulated
 
 Family `double_gyre_shifting_wind_2layer` (acronym `dgsw2l`): a two-layer
-reduced-gravity double-gyre simulation from the Aronnax ocean model, driven by a
+double-gyre simulation from the Aronnax ocean model, driven by a
 zonal wind stress whose pattern shifts sinusoidally in latitude.
 
 Training data: `data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc`
