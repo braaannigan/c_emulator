@@ -3,7 +3,11 @@
 # pipeline dependencies the image lacks, fetch the handler from main and serve.
 set -euo pipefail
 PIP_DEPS="runpod xarray netcdf4 pyyaml scipy"
-pip install --quiet --no-cache-dir $PIP_DEPS 2>/dev/null || pip install --quiet --no-cache-dir --break-system-packages $PIP_DEPS
+# A venv layered on the system site-packages keeps the image's torch but lets
+# pip upgrade packages (e.g. cryptography) that Debian installed system-wide.
+python -m venv --system-site-packages /opt/venv
+/opt/venv/bin/pip install --quiet --no-cache-dir $PIP_DEPS
+export PATH=/opt/venv/bin:$PATH
 rm -rf /opt/c_emulator
 git clone --quiet --depth 1 https://github.com/braaannigan/c_emulator.git /opt/c_emulator
 cd /opt/c_emulator
