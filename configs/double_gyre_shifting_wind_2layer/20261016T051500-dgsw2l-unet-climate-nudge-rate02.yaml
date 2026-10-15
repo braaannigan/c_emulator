@@ -10,7 +10,7 @@ experiment:
     error, giving a final eval_mse_mean below the incumbent's CUDA control and an epochs 30-60
     average below ~166, while short-lead error and the eddy-scale KE/h-std ratios (> 0.9)
     are essentially unchanged.
-  conclusion: null
+  conclusion: Nudge-strength arm; see 20261016T051500-dgsw2l-unet-climate-nudge.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

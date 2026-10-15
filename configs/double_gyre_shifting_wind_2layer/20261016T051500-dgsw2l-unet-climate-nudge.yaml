@@ -17,7 +17,16 @@ experiment:
     error, giving a final eval_mse_mean below the incumbent's CUDA control and an epochs 30-60
     average below ~166, while short-lead error and the eddy-scale KE/h-std ratios (> 0.9)
     are essentially unchanged.
-  conclusion: null
+  conclusion: 'Rejected. Relaxing the 20-cell-block large-scale anomaly toward the training-mean
+    state did not help at any strength (seed 42, CUDA): final eval_mse_mean 170.7 / 164.7
+    / 168.0 at 2% / 5% / 15% per step vs 128.9 for the seed-42 CUDA control (3-seed control
+    mean 148.9); epochs 30-60 averages 175.7 / 170.1 / 180.0 vs 170.2 (control mean 167.1).
+    The strongest arm visibly hurt mid-lead skill (step-10 21 vs 14), because the large-scale
+    anomaly also carries real, predictable gyre-scale variability, not only drift. Fidelity
+    was unaffected (KE 0.90-0.98, h-std 0.96-1.00). The incumbent''s time-mean bias is not
+    a separable drift that relaxation can remove without removing signal; the eval-period
+    mean differs from the training mean by bias^2 11.6, which no training-data-only correction
+    can recover.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
