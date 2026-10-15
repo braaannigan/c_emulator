@@ -1,0 +1,78 @@
+experiment:
+  id: 20261015T231500-dgsw2l-unet-long-lrdecay
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: unet-long-lrdecay
+  kind: tuning
+  rationale: The U-Net incumbent's training loss is still falling at epoch 60 (0.63) and its
+    scheduled rollout scores fluctuate (138-208 over epochs 30-60), suggesting under-training
+    and an unsettled optimiser state at the end of the run.
+  hypothesis: Training the incumbent U-Net recipe for 100 epochs with the learning rate cut
+    by 0.3x at epochs 60 and 80 further lowers short/mid-lead error and settles the late checkpoints,
+    giving a final eval_mse_mean below 155.8 with a narrower spread across epochs 80-100.
+  conclusion: 'Not promoted: modest, consistent gain in average but not at the final checkpoint.
+    Epochs 1-60 reproduce the incumbent exactly (same seed). After the LR cuts, training loss
+    falls from 0.63 to 0.34 and short-lead error improves (step-1 0.7 vs 0.9, step-5 3.4 vs
+    4.6, step-20 ~18-19 vs ~25); scheduled rollouts over epochs 65-100 average 143 (vs ~166
+    for epochs 30-60), with three checkpoints below climatology (130.2, 116.6, 135.6). But
+    the final epoch-100 rollout is 157.2 / 453.7 / vel 0.00235, no better than the incumbent''s
+    155.8. The checkpoint-to-checkpoint spread (117-158) is driven by which eddy realisation
+    the free run follows over the chaotic 50-143-step tail, so single-final-checkpoint comparisons
+    carry a noise floor of roughly +/-20. Physical fidelity unchanged (h-std ~0.98, KE ~0.8-0.95).
+    Longer training helps the predictable part (first ~30 steps) but not the tail that dominates
+    eval_mse_mean.'
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261015T231500-dgsw2l-unet-long-lrdecay.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 100
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+  lr_decay_milestones:
+  - 60
+  - 80
+  lr_decay_factor: 0.3
+model:
+  type: unet
+  hidden_channels: 32
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+  depth: 3
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '
