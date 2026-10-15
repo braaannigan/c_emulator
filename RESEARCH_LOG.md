@@ -2,27 +2,35 @@
 
 ## Current incumbent
 
-`20261015T204500-dgsw2l-unet-multiscale` (seed check:
-`20261015T220000-dgsw2l-unet-multiscale-seed7`).
+`20261016T061500-dgsw2l-unet-ema` (seeds 42/7/123 run in parallel on RunPod:
+`-seed7`, `-seed123`).
 
-- Recipe: 3-level U-Net (32/64/128/256 ch, 2x avg-pool), residual
-  (increment) target, exact per-layer volume conservation over wet cells,
-  land ring pinned, static inputs (train-mean state, coordinates, land
-  mask), 8-step unrolled MSE, white input noise of 1 increment-std on each
-  window start, Adam 3e-4, clip 1.0, 60 epochs.
-- Final rollout: eval_mse_mean 155.8 / last 332.5 / vel 0.00228 (seed 7:
-  148.0 / 342.8 / 0.00183). All 12 scheduled rollouts bounded for both seeds;
-  epochs 30-60 average ~167.
-- Lead-time thickness MSE: step-1 0.9, step-5 11, step-10 19.5, step-20 24.7
-  (previous incumbent: 7.8 / 54 / 60 / 99).
-- Variance-preserving (h-std ratio ~0.97, KE ratio ~0.95). Beats persistence
-  (297.7); not yet climatology (136.8). The long-lead tail still saturates
-  near 2x climate variance, as expected for a faithful free-running model of
-  a chaotic flow.
-- Full rollout: `data/double_gyre_shifting_wind_2layer/rollout/20261015T204500-dgsw2l-unet-multiscale-final-epoch0060.nc`;
-  checkpoint in `data/double_gyre_shifting_wind_2layer/checkpoints/`.
+- Recipe: the U-Net recipe below, evaluated with an exponential moving
+  average of the weights (decay 0.998 per optimiser step). 3-level U-Net
+  (32/64/128/256 ch, 2x avg-pool), residual target, exact per-layer volume
+  conservation over wet cells, land ring pinned, static inputs (train-mean
+  state, coordinates, land mask), 8-step unrolled MSE, white input noise of 1
+  increment-std on each window start, Adam 3e-4, clip 1.0, 60 epochs.
+- Scored against the CUDA control of the previous incumbent
+  (`20261016T050000-dgsw2l-unet-cuda-control`, 3 seeds): epochs 30-60
+  average 151.5 vs 167.1 (every seed better by 12-18); final checkpoints
+  147.0 vs 148.9 (3-seed means, level within noise).
+- Seed-42 final rollout (regenerated locally): eval_mse_mean 158.5 / last
+  287.1 / vel 0.00254; lead-time MSE step-1 0.8, step-5 3.9, step-10 13.7,
+  step-20 17.3. h-std ratio 0.99, KE ratio 0.93.
+- Still not below climatology (136.8): the tail beyond ~50 steps saturates
+  near 2x climate variance. Error decomposition of the U-Net rollout:
+  MSE 155.8 = bias^2 16.1 + var_truth 125.2 + var_model 104.5 - 2cov 90.0.
+- Full rollout: `data/double_gyre_shifting_wind_2layer/rollout/20261016T061500-dgsw2l-unet-ema-final-epoch0060.nc`;
+  checkpoint `data/double_gyre_shifting_wind_2layer/checkpoints/20261016T061500-dgsw2l-unet-ema.pt`
+  (all remote outputs are also on the RunPod volume under `outputs/<id>/`).
+- Experiments now run on the RunPod endpoint (`scripts/runpod_run.py`),
+  three seeds in parallel; compare 3-seed means of the final checkpoint and of
+  epochs 30-60.
 
-Previous incumbent: `20261015T191000-dgsw2l-noise-injection` (CNN, 215.7).
+Previous incumbents: `20261015T204500-dgsw2l-unet-multiscale` (U-Net, MPS
+final 155.8 / 148.0; CUDA 3-seed final 148.9, epochs 30-60 167.1);
+`20261015T191000-dgsw2l-noise-injection` (CNN, 215.7).
 
 ## Reference scores (same evaluator window, 143 steps, no learning)
 
@@ -95,3 +103,88 @@ persistence). Track both MSE and variance/KE diagnostics.
 - Hypothesis: The U-Net recipe is seed-robust: with seed 7 all scheduled rollouts stay bounded, short-lead skill matches seed 42 (step-1 ~1, step-10 ~20), and the final eval_mse_mean is below the incumbent's 215.7.
 - Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 229 / 525.6 / 0.002734 (std 1.01, KE 0.74); 10: 206.1 / 376.2 / 0.00233 (std 1.00, KE 1.02); 15: 223.7 / 328.1 / 0.002547 (std 1.04, KE 0.98); 20: 222.7 / 284.3 / 0.002886 (std 0.98, KE 0.90); 25: 210.8 / 331.5 / 0.002749 (std 0.98, KE 0.91); 30: 184.4 / 417.9 / 0.002346 (std 0.97, KE 0.91); 35: 173.3 / 383.2 / 0.00201 (std 0.95, KE 0.98); 40: 171.1 / 282.8 / 0.001746 (std 0.99, KE 1.00); 45: 178.3 / 431.8 / 0.002223 (std 0.99, KE 0.93); 50: 155.7 / 391.1 / 0.002251 (std 0.99, KE 0.97); 55: 160.1 / 449.9 / 0.001962 (std 0.96, KE 0.92); 60: 148 / 342.8 / 0.001831 (std 1.00, KE 1.00)
 - Conclusion: Seed check passed. Seed 7 stays bounded in all 12 scheduled rollouts, reproduces the short-lead skill (step-1 0.8, step-10 14.9, step-20 24.7) and ends at 148.0 / 342.8 / vel 0.00183 vs seed 42's 155.8 / 332.5 / 0.00228; epochs 30-60 average ~167 for both seeds. The U-Net recipe is promoted to incumbent (seed-42 run as the reference; two-seed final mean 151.9, vs 212.5 for the previous incumbent).
+
+### 20261016T013000-dgsw2l-unet-depth4 — tuning
+- Hypothesis: Adding a fourth U-Net level (all else equal to the incumbent recipe) lowers step-5/10/20 lead MSE, keeps all scheduled rollouts bounded with KE and h-std ratios above 0.9, and gives a final eval_mse_mean below 155.8 with an epochs 30-60 average below ~166.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 303.3 / 566 / 0.002844 (std 0.96, KE 0.89); 10: 257.3 / 493.2 / 0.003539 (std 1.03, KE 1.02); 15: 192.3 / 418 / 0.002704 (std 0.96, KE 0.94); 20: 187.9 / 374 / 0.002511 (std 0.96, KE 0.95); 25: 187 / 452.3 / 0.002622 (std 0.98, KE 0.97); 30: 200.7 / 446.9 / 0.002711 (std 0.98, KE 0.96); 35: 146.5 / 312.4 / 0.001935 (std 0.97, KE 0.98); 40: 171.8 / 382.7 / 0.002621 (std 0.98, KE 0.94); 45: 160 / 406.1 / 0.00225 (std 0.99, KE 0.94); 50: 185 / 358.8 / 0.002642 (std 0.98, KE 0.95); 55: 166.6 / 379.3 / 0.002552 (std 1.00, KE 0.96); 60: 172.6 / 301.5 / 0.002717 (std 0.97, KE 0.94)
+- Conclusion: Rejected. The 4-level U-Net (7.9M params vs 2.0M) stayed bounded with good fidelity (KE 0.94-0.98, h-std 0.97-1.00) but was worse at every lead: step-1 1.4 vs 0.9, step-5 8.3 vs 4.6, step-10 26 vs 11 at epoch 60. Final 172.6 / 301.5 / 0.00272 vs incumbent 155.8 / 332.5 / 0.00228; epochs 30-60 average 171.9 vs ~166. Training loss fell lower (0.38 vs 0.63) while eval lead errors rose, so the extra capacity over-fits the 571 training pairs rather than exploiting the larger receptive field. Capacity is not the bottleneck; regularisation or better inputs are more promising.
+
+### 20261016T023000-dgsw2l-unet-wind-pair — medium_step
+- Hypothesis: Feeding the U-Net incumbent the wind at both the start (t) and end (t+1) of each step lowers short-lead error (step-1 below 0.9, step-5 below 4.6) and the final eval_mse_mean below 155.8 with an epochs 30-60 average below ~166, while staying bounded with KE and h-std ratios above 0.9.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 257.7 / 451.9 / 0.003111 (std 1.04, KE 0.91); 10: 210.1 / 288.8 / 0.002708 (std 0.92, KE 0.88); 15: 216.6 / 240 / 0.003028 (std 0.99, KE 0.88); 20: 202.1 / 357.2 / 0.002889 (std 0.94, KE 1.00); 25: 201.6 / 348.2 / 0.002707 (std 0.96, KE 1.05); 30: 159.1 / 318.4 / 0.002147 (std 0.96, KE 0.88); 35: 149.4 / 344.2 / 0.002514 (std 0.99, KE 0.95); 40: 151.8 / 340.1 / 0.002241 (std 0.97, KE 0.90); 45: 179.4 / 376.1 / 0.002516 (std 0.96, KE 0.87); 50: 142.7 / 419.6 / 0.002193 (std 0.96, KE 0.93); 55: 145.5 / 331.2 / 0.001918 (std 1.01, KE 1.02); 60: 187.7 / 446.5 / 0.00247 (std 0.97, KE 0.94)
+- Conclusion: Inconclusive, not promoted. Giving the U-Net the wind at both ends of each step kept rollouts bounded (KE 0.87-1.05, h-std 0.96-1.02) and the epochs 30-60 average improved slightly (159.4 vs 165.8 for the incumbent seed-42 run), but the final checkpoint scored 187.7 / 446.5 / 0.00247 vs 155.8 / 332.5 / 0.00228, and short-lead error at epoch 60 was no better (step-1 0.9, step-5 5.4 vs 4.6, step-10 18 vs 11). The ~6-point average gain is well inside the +/-20 checkpoint noise floor, so the end-of-step wind carries little extra information at 7-day sampling, consistent with wind phase explaining almost no thickness variance. Keep forcing_window available (default 1) but do not adopt.
+
+### 20261016T040000-dgsw2l-unet-two-frame — bigger_jump
+- Hypothesis: Adding the previous-step tendency as input channels (history_frames=2) to the incumbent U-Net recipe lowers step-1/5/10/20 lead MSE and, averaged over seeds 42/7/123, gives a final eval_mse_mean below the incumbent's two-seed mean of 151.9 and an epochs 30-60 average below ~166, while staying bounded with KE and h-std ratios above 0.9.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 261.5 / 506.5 / 0.002946 (std 0.99, KE 0.84); 10: 258.3 / 440.5 / 0.003212 (std 0.95, KE 0.90); 15: 297.7 / 424.7 / 0.002931 (std 0.92, KE 1.02); 20: 217.6 / 316.6 / 0.003408 (std 0.93, KE 0.97); 25: 152.1 / 350.1 / 0.001904 (std 0.99, KE 0.90); 30: 215.4 / 367 / 0.002587 (std 1.02, KE 0.94); 35: 186.2 / 339.5 / 0.002128 (std 0.96, KE 0.88); 40: 183.6 / 417.4 / 0.002635 (std 0.97, KE 0.93); 45: 187.6 / 400.6 / 0.002649 (std 0.96, KE 0.94); 50: 195.5 / 413.2 / 0.002619 (std 0.97, KE 1.01); 55: 139.5 / 341.7 / 0.002174 (std 0.97, KE 0.95); 60: 184.2 / 445.7 / 0.002777 (std 0.98, KE 0.95)
+- Conclusion: Rejected across three seeds (run in parallel on RunPod RTX 4090s, 6-15 min each incl. startup). Final eval_mse_mean 184.2 / 176.8 / 171.7 (seeds 42/7/123, mean 177.6) vs the incumbent's 155.8 / 148.0 (mean 151.9); epochs 30-60 averages 184.6 / 177.0 / 188.1 vs ~166. The tendency input does sharpen the first step (step-1 MSE 0.5-0.6 vs 0.9) but mid-lead error gets worse (step-10 17-22 vs 11; step-20 ~similar), so the free run decorrelates sooner. In rollout the tendency channel is the model's own previous increment, so its errors are fed back with a gain: the network learns to extrapolate the tendency, which is accurate for one step under teacher forcing but amplifies drift. Fidelity stayed acceptable (KE 0.87-0.95, h-std 0.94-1.00). Caveat: these ran on CUDA while the incumbent ran on MPS; a CUDA control of the incumbent is needed before reading small differences.
+
+### 20261016T040000-dgsw2l-unet-two-frame-seed7 — tuning
+- Hypothesis: Adding the previous-step tendency as input channels (history_frames=2) to the incumbent U-Net recipe lowers step-1/5/10/20 lead MSE and, averaged over seeds 42/7/123, gives a final eval_mse_mean below the incumbent's two-seed mean of 151.9 and an epochs 30-60 average below ~166, while staying bounded with KE and h-std ratios above 0.9.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 300.4 / 553.8 / 0.003104 (std 0.94, KE 0.77); 10: 180.4 / 327.7 / 0.001776 (std 0.99, KE 0.85); 15: 207.1 / 293.2 / 0.002554 (std 0.98, KE 0.92); 20: 151.4 / 206.5 / 0.002167 (std 0.96, KE 1.04); 25: 168.8 / 391.3 / 0.002335 (std 1.02, KE 0.95); 30: 176.2 / 363.8 / 0.002585 (std 0.98, KE 0.98); 35: 176.5 / 441.7 / 0.002396 (std 0.98, KE 1.01); 40: 176.5 / 431.7 / 0.002512 (std 1.02, KE 0.96); 45: 193.2 / 398.7 / 0.002751 (std 0.98, KE 0.91); 50: 179 / 478.2 / 0.002401 (std 0.99, KE 0.95); 55: 161 / 431.3 / 0.002492 (std 0.99, KE 0.95); 60: 176.8 / 374.5 / 0.002611 (std 1.00, KE 0.90)
+- Conclusion: Seed replica; see 20261016T040000-dgsw2l-unet-two-frame for the joint three-seed conclusion (final 176.8).
+
+### 20261016T040000-dgsw2l-unet-two-frame-seed123 — tuning
+- Hypothesis: Adding the previous-step tendency as input channels (history_frames=2) to the incumbent U-Net recipe lowers step-1/5/10/20 lead MSE and, averaged over seeds 42/7/123, gives a final eval_mse_mean below the incumbent's two-seed mean of 151.9 and an epochs 30-60 average below ~166, while staying bounded with KE and h-std ratios above 0.9.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 343.9 / 711.9 / 0.003402 (std 0.94, KE 0.85); 10: 360 / 808.7 / 0.003184 (std 0.97, KE 0.92); 15: 345.1 / 665.4 / 0.003023 (std 1.02, KE 0.92); 20: 232.2 / 449.5 / 0.003375 (std 0.92, KE 0.98); 25: 210.2 / 164.5 / 0.002197 (std 0.90, KE 0.96); 30: 197.1 / 339.3 / 0.00258 (std 1.01, KE 0.87); 35: 211.1 / 410.3 / 0.00237 (std 0.90, KE 0.92); 40: 177 / 424.8 / 0.002482 (std 0.97, KE 0.98); 45: 219.1 / 441 / 0.002571 (std 0.92, KE 0.94); 50: 177.2 / 348.9 / 0.002756 (std 0.97, KE 0.96); 55: 163.4 / 455.3 / 0.002235 (std 0.97, KE 0.97); 60: 171.7 / 391.7 / 0.002011 (std 0.98, KE 0.87)
+- Conclusion: Seed replica; see 20261016T040000-dgsw2l-unet-two-frame for the joint three-seed conclusion (final 171.7).
+
+### 20261016T050000-dgsw2l-unet-cuda-control — tuning
+- Hypothesis: The incumbent U-Net recipe, unchanged, trained on RunPod CUDA (RTX 4090) instead of local MPS, scores within the +/-20 checkpoint noise of its MPS runs (155.8 / 148.0), giving a like-for-like CUDA baseline and a three-seed spread for judging later remote experiments.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 391.1 / 772.5 / 0.003959 (std 0.86, KE 1.00); 10: 168.8 / 332 / 0.002208 (std 0.96, KE 0.99); 15: 200.4 / 405.1 / 0.002272 (std 1.03, KE 0.99); 20: 221.7 / 327.9 / 0.003499 (std 0.95, KE 0.93); 25: 243.8 / 366.7 / 0.002854 (std 0.97, KE 0.93); 30: 196.4 / 293.8 / 0.002162 (std 1.00, KE 0.95); 35: 179.9 / 307.8 / 0.002228 (std 0.99, KE 0.98); 40: 185.8 / 233.2 / 0.001931 (std 0.98, KE 0.96); 45: 174.9 / 438.2 / 0.002729 (std 0.97, KE 0.93); 50: 154.8 / 266.1 / 0.002249 (std 0.99, KE 0.95); 55: 170.4 / 362.5 / 0.002427 (std 0.99, KE 0.96); 60: 128.9 / 236.8 / 0.001891 (std 0.99, KE 0.92)
+- Conclusion: Control established. The unchanged incumbent recipe on RunPod CUDA (RTX 4090, 5-6 min per run plus ~40 s queue) gives final eval_mse_mean 128.9 / 168.1 / 149.7 (seeds 42/7/123; mean 148.9, spread +/-20) and epochs 30-60 averages 170.2 / 162.8 / 168.4 (mean 167.1), consistent with the MPS runs (155.8 / 148.0; ~166). Backend does not shift scores beyond seed noise. Reference for remote experiments: 3-seed final mean 148.9 and 3-seed epochs 30-60 mean 167.1; a candidate needs to beat both by more than the ~10-point standard error of a 3-seed mean. Against this control the two-frame model (177.6 / 183.2) is confirmed worse.
+
+### 20261016T050000-dgsw2l-unet-cuda-control-seed7 — tuning
+- Hypothesis: The incumbent U-Net recipe, unchanged, trained on RunPod CUDA (RTX 4090) instead of local MPS, scores within the +/-20 checkpoint noise of its MPS runs (155.8 / 148.0), giving a like-for-like CUDA baseline and a three-seed spread for judging later remote experiments.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 232.4 / 535.5 / 0.002797 (std 1.01, KE 0.70); 10: 265.9 / 412.4 / 0.003404 (std 0.98, KE 0.94); 15: 220.9 / 470.4 / 0.003306 (std 0.99, KE 0.96); 20: 209.7 / 321.9 / 0.003008 (std 0.98, KE 0.93); 25: 155.5 / 301.4 / 0.001737 (std 1.00, KE 0.89); 30: 143.7 / 356.3 / 0.002054 (std 0.99, KE 0.90); 35: 158.5 / 302.1 / 0.002105 (std 0.95, KE 0.95); 40: 188.9 / 327.4 / 0.002033 (std 1.01, KE 0.97); 45: 168.7 / 370 / 0.00225 (std 0.97, KE 0.93); 50: 135.6 / 373.1 / 0.002039 (std 0.97, KE 0.93); 55: 175.8 / 376.7 / 0.002294 (std 0.97, KE 0.96); 60: 168.1 / 338.1 / 0.002263 (std 0.98, KE 0.95)
+- Conclusion: Seed replica; see 20261016T050000-dgsw2l-unet-cuda-control.
+
+### 20261016T050000-dgsw2l-unet-cuda-control-seed123 — tuning
+- Hypothesis: The incumbent U-Net recipe, unchanged, trained on RunPod CUDA (RTX 4090) instead of local MPS, scores within the +/-20 checkpoint noise of its MPS runs (155.8 / 148.0), giving a like-for-like CUDA baseline and a three-seed spread for judging later remote experiments.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 294.8 / 566 / 0.003111 (std 1.06, KE 0.95); 10: 272.3 / 484.5 / 0.003096 (std 1.04, KE 0.84); 15: 166.7 / 308.9 / 0.002141 (std 0.99, KE 0.97); 20: 186.6 / 383.6 / 0.0023 (std 1.00, KE 1.00); 25: 196.6 / 356.2 / 0.002413 (std 1.02, KE 0.99); 30: 153.6 / 353.3 / 0.002255 (std 1.00, KE 0.88); 35: 153.7 / 386.7 / 0.002074 (std 0.99, KE 0.94); 40: 200.6 / 273.5 / 0.003106 (std 0.98, KE 0.94); 45: 153.9 / 248.5 / 0.002124 (std 1.00, KE 0.92); 50: 183.2 / 396.8 / 0.002305 (std 0.99, KE 0.91); 55: 183.8 / 500.3 / 0.00201 (std 1.01, KE 0.90); 60: 149.7 / 349 / 0.002407 (std 1.00, KE 0.89)
+- Conclusion: Seed replica; see 20261016T050000-dgsw2l-unet-cuda-control.
+
+### 20261016T051500-dgsw2l-unet-climate-nudge — bigger_jump
+- Hypothesis: Relaxing the 20-cell-block large-scale anomaly toward the training-mean state at 5% per step (with 2% and 15% arms) reduces the rollout's time-mean bias^2 and tail error, giving a final eval_mse_mean below the incumbent's CUDA control and an epochs 30-60 average below ~166, while short-lead error and the eddy-scale KE/h-std ratios (> 0.9) are essentially unchanged.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 336 / 659.7 / 0.003357 (std 1.00, KE 1.04); 10: 170.3 / 314.3 / 0.002331 (std 0.96, KE 0.86); 15: 181.4 / 304.5 / 0.00247 (std 0.98, KE 1.00); 20: 210.1 / 335.9 / 0.003254 (std 0.99, KE 0.98); 25: 164.4 / 352.4 / 0.002218 (std 0.96, KE 0.81); 30: 171.6 / 311.7 / 0.002557 (std 0.99, KE 0.98); 35: 164.4 / 313.7 / 0.002101 (std 0.96, KE 0.95); 40: 193.6 / 300.7 / 0.0024 (std 0.96, KE 0.94); 45: 180.8 / 433.8 / 0.002653 (std 0.99, KE 0.94); 50: 148.2 / 247.2 / 0.002068 (std 0.96, KE 0.93); 55: 167.7 / 407.9 / 0.002537 (std 0.98, KE 0.95); 60: 164.7 / 406.8 / 0.00226 (std 0.97, KE 0.95)
+- Conclusion: Rejected. Relaxing the 20-cell-block large-scale anomaly toward the training-mean state did not help at any strength (seed 42, CUDA): final eval_mse_mean 170.7 / 164.7 / 168.0 at 2% / 5% / 15% per step vs 128.9 for the seed-42 CUDA control (3-seed control mean 148.9); epochs 30-60 averages 175.7 / 170.1 / 180.0 vs 170.2 (control mean 167.1). The strongest arm visibly hurt mid-lead skill (step-10 21 vs 14), because the large-scale anomaly also carries real, predictable gyre-scale variability, not only drift. Fidelity was unaffected (KE 0.90-0.98, h-std 0.96-1.00). The incumbent's time-mean bias is not a separable drift that relaxation can remove without removing signal; the eval-period mean differs from the training mean by bias^2 11.6, which no training-data-only correction can recover.
+
+### 20261016T051500-dgsw2l-unet-climate-nudge-rate02 — tuning
+- Hypothesis: Relaxing the 20-cell-block large-scale anomaly toward the training-mean state at 5% per step (with 2% and 15% arms) reduces the rollout's time-mean bias^2 and tail error, giving a final eval_mse_mean below the incumbent's CUDA control and an epochs 30-60 average below ~166, while short-lead error and the eddy-scale KE/h-std ratios (> 0.9) are essentially unchanged.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 390.2 / 758.5 / 0.003568 (std 0.91, KE 1.04); 10: 245.1 / 383.3 / 0.003222 (std 1.00, KE 0.98); 15: 161.2 / 232.6 / 0.00208 (std 1.00, KE 1.02); 20: 179.8 / 339.1 / 0.002967 (std 0.97, KE 0.86); 25: 199.4 / 368.2 / 0.002481 (std 0.95, KE 0.91); 30: 191.9 / 325.8 / 0.002457 (std 0.98, KE 0.91); 35: 175.5 / 412.9 / 0.002556 (std 0.99, KE 0.90); 40: 152.7 / 283.7 / 0.00198 (std 0.97, KE 0.96); 45: 174.2 / 257.5 / 0.002705 (std 0.99, KE 0.99); 50: 179.9 / 420.4 / 0.002714 (std 0.98, KE 0.93); 55: 184.8 / 361.9 / 0.002717 (std 0.99, KE 0.94); 60: 170.7 / 287.8 / 0.002158 (std 0.98, KE 0.97)
+- Conclusion: Nudge-strength arm; see 20261016T051500-dgsw2l-unet-climate-nudge.
+
+### 20261016T051500-dgsw2l-unet-climate-nudge-rate15 — tuning
+- Hypothesis: Relaxing the 20-cell-block large-scale anomaly toward the training-mean state at 5% per step (with 2% and 15% arms) reduces the rollout's time-mean bias^2 and tail error, giving a final eval_mse_mean below the incumbent's CUDA control and an epochs 30-60 average below ~166, while short-lead error and the eddy-scale KE/h-std ratios (> 0.9) are essentially unchanged.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 240.6 / 450.4 / 0.002422 (std 1.04, KE 0.86); 10: 221.2 / 408 / 0.002732 (std 0.95, KE 0.80); 15: 170 / 343.8 / 0.002417 (std 1.00, KE 0.96); 20: 212.1 / 551.7 / 0.002775 (std 0.98, KE 0.98); 25: 193.9 / 223.4 / 0.002643 (std 1.00, KE 0.92); 30: 173.5 / 454.1 / 0.002519 (std 0.98, KE 0.91); 35: 154.3 / 283.5 / 0.002237 (std 0.98, KE 0.90); 40: 185.4 / 398.4 / 0.002621 (std 0.97, KE 0.97); 45: 211.2 / 315 / 0.002486 (std 0.99, KE 0.96); 50: 191.7 / 281.6 / 0.002423 (std 0.96, KE 0.91); 55: 175.9 / 308.9 / 0.002118 (std 0.97, KE 0.96); 60: 168 / 255 / 0.002589 (std 0.97, KE 0.93)
+- Conclusion: Nudge-strength arm; see 20261016T051500-dgsw2l-unet-climate-nudge.
+
+### 20261016T060000-dgsw2l-unet-heun-pec — bigger_jump
+- Hypothesis: Using a Heun predictor-corrector step (two U-Net evaluations per 7-day step) in the incumbent recipe lowers mid-lead error (step-10/20) and gives a 3-seed final eval_mse_mean below the CUDA control's 148.9 and a 3-seed epochs 30-60 mean below 167.1 by more than ~10, with KE and h-std ratios above 0.9.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 313.6 / 541.6 / 0.003701 (std 0.89, KE 0.95); 10: 236.2 / 391 / 0.00278 (std 0.96, KE 0.91); 15: 215 / 373.3 / 0.002698 (std 0.96, KE 1.13); 20: 226.2 / 445.4 / 0.003463 (std 0.95, KE 1.00); 25: 173.7 / 171.1 / 0.00213 (std 0.97, KE 0.91); 30: 189.2 / 352.9 / 0.00269 (std 0.98, KE 0.95); 35: 177.7 / 369.5 / 0.002416 (std 1.00, KE 0.98); 40: 163 / 328.4 / 0.002211 (std 0.98, KE 0.92); 45: 169.3 / 267.6 / 0.002477 (std 0.99, KE 0.97); 50: 139.7 / 327.1 / 0.002615 (std 0.98, KE 0.94); 55: 152.7 / 259.9 / 0.002125 (std 0.98, KE 0.95); 60: 126.3 / 197.5 / 0.001967 (std 0.96, KE 0.94)
+- Conclusion: Neutral, not promoted. Heun predictor-corrector integration (two U-Net evaluations per step, ~2x run time: 10-12 min on RTX 4090) gives 3-seed final eval_mse_mean 126.3 / 132.1 / 180.3 (mean 146.2) vs the CUDA control's 128.9 / 168.1 / 149.7 (mean 148.9), and 3-seed epochs 30-60 means 159.7 / 159.0 / 181.3 (mean 166.7) vs 167.1. Both differences are far inside the ~10-point standard error. Lead-time error and fidelity (KE 0.87-1.01, h-std 0.96-1.02) are also indistinguishable. Second-order time integration does not change the error growth: the learned one-step map was already smooth enough, and the chaotic divergence after ~20 steps is set by the dynamics, not the integrator. Not worth the 2x cost.
+
+### 20261016T060000-dgsw2l-unet-heun-pec-seed7 — tuning
+- Hypothesis: Using a Heun predictor-corrector step (two U-Net evaluations per 7-day step) in the incumbent recipe lowers mid-lead error (step-10/20) and gives a 3-seed final eval_mse_mean below the CUDA control's 148.9 and a 3-seed epochs 30-60 mean below 167.1 by more than ~10, with KE and h-std ratios above 0.9.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 265.3 / 556.2 / 0.002908 (std 0.97, KE 0.76); 10: 191.8 / 334.4 / 0.002429 (std 1.00, KE 0.86); 15: 200.7 / 440.7 / 0.002278 (std 1.07, KE 1.01); 20: 190.7 / 278.3 / 0.002406 (std 1.01, KE 0.90); 25: 220.7 / 377 / 0.00286 (std 0.99, KE 0.89); 30: 156 / 284.7 / 0.002227 (std 0.96, KE 0.87); 35: 173.2 / 378.6 / 0.00232 (std 0.99, KE 0.97); 40: 183.1 / 446.7 / 0.002299 (std 1.00, KE 0.99); 45: 154.6 / 265.2 / 0.00245 (std 0.96, KE 0.89); 50: 147.5 / 470.6 / 0.002029 (std 0.97, KE 0.90); 55: 166.3 / 455.9 / 0.002142 (std 0.98, KE 0.96); 60: 132.1 / 331.1 / 0.00175 (std 0.96, KE 1.01)
+- Conclusion: Seed replica; see 20261016T060000-dgsw2l-unet-heun-pec.
+
+### 20261016T060000-dgsw2l-unet-heun-pec-seed123 — tuning
+- Hypothesis: Using a Heun predictor-corrector step (two U-Net evaluations per 7-day step) in the incumbent recipe lowers mid-lead error (step-10/20) and gives a 3-seed final eval_mse_mean below the CUDA control's 148.9 and a 3-seed epochs 30-60 mean below 167.1 by more than ~10, with KE and h-std ratios above 0.9.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 213.5 / 318.3 / 0.002793 (std 0.99, KE 0.76); 10: 253.7 / 370.2 / 0.003004 (std 0.99, KE 0.84); 15: 192.7 / 300.9 / 0.002643 (std 1.01, KE 0.89); 20: 165.7 / 300.9 / 0.001908 (std 0.98, KE 0.98); 25: 204.4 / 307.7 / 0.003293 (std 1.02, KE 0.88); 30: 188.2 / 332.2 / 0.002773 (std 0.98, KE 0.93); 35: 179.5 / 373.9 / 0.002386 (std 0.97, KE 0.88); 40: 159.8 / 360.3 / 0.002415 (std 1.02, KE 0.93); 45: 190.2 / 480.5 / 0.002868 (std 0.97, KE 0.97); 50: 165.4 / 366.3 / 0.002041 (std 0.97, KE 0.97); 55: 205.9 / 287.7 / 0.003221 (std 1.00, KE 0.92); 60: 180.3 / 318.2 / 0.002909 (std 1.01, KE 0.95)
+- Conclusion: Seed replica; see 20261016T060000-dgsw2l-unet-heun-pec.
+
+### 20261016T061500-dgsw2l-unet-ema — tuning
+- Hypothesis: Evaluating with EMA weights (decay 0.998) lowers the 3-seed final eval_mse_mean below the CUDA control's 148.9 and the 3-seed epochs 30-60 mean below 167.1 by more than ~10, and narrows the spread across scheduled rollouts, with KE and h-std ratios above 0.9.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 269.4 / 391.6 / 0.00455 (std 0.92, KE 0.77); 10: 206.2 / 294.3 / 0.002821 (std 0.91, KE 0.45); 15: 177.9 / 293.6 / 0.002602 (std 0.94, KE 0.44); 20: 194.6 / 300.3 / 0.00242 (std 1.00, KE 0.62); 25: 196.7 / 308.8 / 0.002329 (std 1.01, KE 0.75); 30: 154.7 / 263.5 / 0.001862 (std 1.00, KE 0.82); 35: 146.2 / 231.9 / 0.001796 (std 0.99, KE 0.87); 40: 141.2 / 323 / 0.001846 (std 0.99, KE 0.90); 45: 157.3 / 386.9 / 0.002235 (std 0.99, KE 0.93); 50: 166.7 / 343 / 0.002449 (std 0.99, KE 0.93); 55: 166.7 / 357.9 / 0.002543 (std 0.99, KE 0.93); 60: 159 / 288.6 / 0.002554 (std 0.99, KE 0.93)
+- Conclusion: Supported; promoted to incumbent (three seeds already run). Evaluating with an exponential moving average of the weights (decay 0.998 per step) improves every seed over the whole late-training sequence: epochs 30-60 averages 156.0 / 148.2 / 150.4 (seeds 42/7/123; mean 151.5) vs the CUDA control's 170.2 / 162.8 / 168.4 (mean 167.1), a 15.6-point gain, well beyond the ~10-point standard error, with smaller checkpoint-to-checkpoint swings (seed 7: 134-157 vs 136-189). Final checkpoints 159.0 / 156.9 / 125.0 (mean 147.0) vs 148.9 are level, as expected from single-checkpoint noise. Velocity MSE also improves (final 0.0018-0.0026, late-epoch mean ~0.0021 vs ~0.0023). Short-lead skill matches the control (step-1 0.7-0.8, step-5 3.9-5.2) and fidelity holds (h-std 0.98-0.99, KE 0.92-0.94 at epoch 60). Early checkpoints lag (KE 0.4-0.6 at epochs 10-20) because the average still includes early weights; irrelevant by epoch 30. Rollout regenerated locally from the seed-42 checkpoint: 158.5 / 287.1 / 0.00254 (CUDA 159.0).
+
+### 20261016T061500-dgsw2l-unet-ema-seed7 — tuning
+- Hypothesis: Evaluating with EMA weights (decay 0.998) lowers the 3-seed final eval_mse_mean below the CUDA control's 148.9 and the 3-seed epochs 30-60 mean below 167.1 by more than ~10, and narrows the spread across scheduled rollouts, with KE and h-std ratios above 0.9.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 251.9 / 380.5 / 0.005486 (std 0.93, KE 1.04); 10: 185 / 290.6 / 0.002877 (std 0.92, KE 0.49); 15: 167.2 / 262.3 / 0.002596 (std 0.91, KE 0.38); 20: 171.6 / 260.5 / 0.002466 (std 0.93, KE 0.45); 25: 171.5 / 270.7 / 0.002137 (std 0.96, KE 0.63); 30: 157.3 / 274.3 / 0.001903 (std 0.99, KE 0.76); 35: 133.6 / 237.9 / 0.00168 (std 0.99, KE 0.85); 40: 141.6 / 327 / 0.001798 (std 0.99, KE 0.90); 45: 144.3 / 369 / 0.002005 (std 1.00, KE 0.92); 50: 149.3 / 396 / 0.002132 (std 0.99, KE 0.93); 55: 154.1 / 369.6 / 0.00221 (std 0.98, KE 0.93); 60: 156.9 / 376.9 / 0.002304 (std 0.98, KE 0.94)
+- Conclusion: Seed replica; see 20261016T061500-dgsw2l-unet-ema.
+
+### 20261016T061500-dgsw2l-unet-ema-seed123 — tuning
+- Hypothesis: Evaluating with EMA weights (decay 0.998) lowers the 3-seed final eval_mse_mean below the CUDA control's 148.9 and the 3-seed epochs 30-60 mean below 167.1 by more than ~10, and narrows the spread across scheduled rollouts, with KE and h-std ratios above 0.9.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 249.4 / 335.6 / 0.004873 (std 0.89, KE 0.80); 10: 215.1 / 270.6 / 0.002966 (std 0.81, KE 0.40); 15: 188.3 / 259.9 / 0.002604 (std 0.84, KE 0.39); 20: 185.1 / 232.4 / 0.002258 (std 0.92, KE 0.58); 25: 185.4 / 253.2 / 0.002283 (std 0.96, KE 0.70); 30: 156 / 242.2 / 0.001959 (std 0.99, KE 0.79); 35: 134.8 / 237.9 / 0.001689 (std 0.99, KE 0.86); 40: 159.6 / 403.4 / 0.002232 (std 0.99, KE 0.89); 45: 176.1 / 467.4 / 0.002645 (std 0.99, KE 0.91); 50: 154.8 / 330.6 / 0.002273 (std 0.99, KE 0.92); 55: 146.5 / 280.2 / 0.002164 (std 0.99, KE 0.93); 60: 125 / 232.3 / 0.001839 (std 0.98, KE 0.92)
+- Conclusion: Seed replica; see 20261016T061500-dgsw2l-unet-ema.

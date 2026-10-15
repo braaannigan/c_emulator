@@ -11,6 +11,7 @@ import numpy as np
 import torch
 import xarray as xr
 from torch import nn
+from torch.optim.swa_utils import AveragedModel, get_ema_multi_avg_fn
 from torch.utils.data import DataLoader
 
 from src.config import ExperimentConfig, load_config
@@ -167,6 +168,7 @@ def train_one_epoch(
     device: torch.device,
     gradient_clip_norm: float | None = None,
     noise_std: float = 0.0,
+    ema: AveragedModel | None = None,
 ) -> float:
     stepper.train()
     losses: list[float] = []
@@ -179,6 +181,8 @@ def train_one_epoch(
         if gradient_clip_norm is not None:
             torch.nn.utils.clip_grad_norm_(stepper.parameters(), gradient_clip_norm)
         optimiser.step()
+        if ema is not None:
+            ema.update_parameters(stepper)
         losses.append(float(loss.detach().cpu()))
     return float(np.mean(losses))
 
@@ -283,6 +287,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
             "target_mode": stepper.target_mode,
             "mass_conserving": stepper.mass_conserving,
             "unroll_steps": unroll_steps,
+            "ema_decay": config.raw.get("training", {}).get("ema_decay"),
             "input_noise_std": noise_std,
             "static_fields": static_fields,
             "fixed_land_cells": bool(stepper.fixed_mask.numel()),
@@ -295,10 +300,15 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     write_json_log(config.experiment_log, log)
     last_metrics: tuple[float, float] | None = None
     last_path: Path | None = None
-    emulator = StepperEmulator(stepper, device)
+    ema_decay = config.raw.get("training", {}).get("ema_decay")
+    # With ema_decay, scheduled rollouts and the checkpoint use an exponential
+    # moving average of the weights instead of the latest optimiser iterate.
+    ema = None if ema_decay is None else AveragedModel(stepper, multi_avg_fn=get_ema_multi_avg_fn(float(ema_decay)))
+    eval_stepper = stepper if ema is None else ema.module
+    emulator = StepperEmulator(eval_stepper, device)
     for epoch in range(1, epochs + 1):
         started = time.perf_counter()
-        loss = train_one_epoch(stepper, loader, optimiser, device, gradient_clip_norm=config.gradient_clip_norm, noise_std=noise_std)
+        loss = train_one_epoch(stepper, loader, optimiser, device, gradient_clip_norm=config.gradient_clip_norm, noise_std=noise_std, ema=ema)
         elapsed = time.perf_counter() - started
         log["epochs"].append(
             {
@@ -348,7 +358,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     if not smoke_test:
         checkpoint = config.results_csv.parent / "checkpoints" / f"{config.experiment_id}.pt"
         checkpoint.parent.mkdir(parents=True, exist_ok=True)
-        torch.save(stepper.state_dict(), checkpoint)
+        torch.save(eval_stepper.state_dict(), checkpoint)
     append_result(config.results_csv, config.experiment_id, last_metrics[0], last_metrics[1], epochs, config.hypothesis, config.conclusion)
     return {"experiment_id": config.experiment_id, "eval_mse_mean": last_metrics[0], "eval_mse_last": last_metrics[1], "epochs_completed": epochs, "rollout_path": None if last_path is None else str(last_path), "experiment_log": str(config.experiment_log)}
 
