@@ -20,8 +20,11 @@ class StateStepper(nn.Module):
     ``static`` holds already-normalised time-invariant context channels
     ``(channels, y, x)`` appended to every network input.
 
+    ``fixed_mask`` ``(y, x)`` marks land cells whose state never changes; they
+    are pinned to ``fixed_values`` ``(channels, y, x)`` after every step.
+
     With ``mass_conserving`` the per-layer domain-mean thickness change is
-    projected out, so each layer's volume is conserved exactly (as in the
+    projected out (over wet cells when a fixed mask is given), so each layer's volume is conserved exactly (as in the
     source model).
     """
 
@@ -35,6 +38,8 @@ class StateStepper(nn.Module):
         target_mode: str = "next_state",
         mass_conserving: bool = False,
         static: np.ndarray | None = None,
+        fixed_mask: np.ndarray | None = None,
+        fixed_values: np.ndarray | None = None,
     ):
         super().__init__()
         if target_mode not in {"next_state", "residual"}:
@@ -48,6 +53,12 @@ class StateStepper(nn.Module):
         self.register_buffer("output_std", torch.as_tensor(output_std, dtype=torch.float32)[None, :, None, None])
         static_tensor = torch.zeros(0) if static is None else torch.as_tensor(static, dtype=torch.float32)[None]
         self.register_buffer("static", static_tensor)
+        if (fixed_mask is None) != (fixed_values is None):
+            raise ValueError("fixed_mask and fixed_values must be given together")
+        mask = torch.zeros(0, dtype=torch.bool) if fixed_mask is None else torch.as_tensor(fixed_mask, dtype=torch.bool)[None, None]
+        values = torch.zeros(0) if fixed_values is None else torch.as_tensor(fixed_values, dtype=torch.float32)[None]
+        self.register_buffer("fixed_mask", mask)
+        self.register_buffer("fixed_values", values)
 
     def forward(self, state: torch.Tensor, forcing: torch.Tensor) -> torch.Tensor:
         x = (torch.cat([state, forcing[:, None]], dim=1) - self.input_mean) / self.input_std
@@ -58,11 +69,21 @@ class StateStepper(nn.Module):
             delta = out
         else:
             delta = out - state
+        has_fixed = bool(self.fixed_mask.numel())
+        if has_fixed:
+            delta = delta.masked_fill(self.fixed_mask, 0.0)
         if self.mass_conserving:
             h_delta = delta[:, :N_LAYERS]
-            h_delta = h_delta - h_delta.mean(dim=(2, 3), keepdim=True)
+            if has_fixed:
+                wet = (~self.fixed_mask).to(h_delta.dtype)
+                h_delta = (h_delta - (h_delta * wet).sum(dim=(2, 3), keepdim=True) / wet.sum()) * wet
+            else:
+                h_delta = h_delta - h_delta.mean(dim=(2, 3), keepdim=True)
             delta = torch.cat([h_delta, delta[:, N_LAYERS:]], dim=1)
-        return state + delta
+        nxt = state + delta
+        if has_fixed:
+            nxt = torch.where(self.fixed_mask, self.fixed_values, nxt)
+        return nxt
 
 
 class StepperEmulator:

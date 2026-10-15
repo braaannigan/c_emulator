@@ -12,6 +12,7 @@ from src.pipelines.dgsw2l_baseline import (
     build_state_model,
     build_stepper,
     rollout_diagnostics,
+    fixed_cell_mask,
     static_context,
     unrolled_loss,
     current_learning_rate,
@@ -78,6 +79,9 @@ def test_build_state_model_uses_config_values():
     assert len(convs) == 4
     assert convs[0].out_channels == 5
     assert convs[0].kernel_size == (5, 5)
+    assert convs[0].padding_mode == "zeros"
+    reflect = build_state_model({"padding_mode": "reflect"}, 7, 6)
+    assert all(layer.padding_mode == "reflect" for layer in reflect.net if isinstance(layer, torch.nn.Conv2d))
 
 
 def test_learning_rate_helpers_and_device():
@@ -197,3 +201,18 @@ def test_run_experiment_full_saves_checkpoint(tmp_path):
 
     state_dict = torch.load(tmp_path / "checkpoints" / "tiny.pt")
     assert state_dict["static"].shape[:2] == (1, 2)
+
+
+def test_fixed_cell_mask_and_land_mask_channel():
+    rng = np.random.default_rng(0)
+    state = rng.normal(size=(6, 6, 3, 4)).astype("float32")
+    state[:, :, 0, :] = 7.0
+    idx = np.arange(4)
+    mask, values = fixed_cell_mask(state, idx)
+    assert mask[0].all() and not mask[1:].any()
+    np.testing.assert_allclose(values[:, 0], 7.0)
+    static = static_context(["land_mask"], state, idx, np.zeros(7, dtype="float32"), np.ones(7, dtype="float32"))
+    np.testing.assert_allclose(static[0], mask.astype("float32"))
+    inputs = np.concatenate([state, np.zeros((6, 1, 3, 4), dtype="float32")], axis=1)
+    stepper = build_stepper({"hidden_channels": 2, "hidden_layers": 1, "target_mode": "residual", "fixed_land_cells": True}, inputs, state, idx)
+    assert stepper.fixed_mask.shape == (1, 1, 3, 4)

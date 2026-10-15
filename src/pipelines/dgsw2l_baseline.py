@@ -61,14 +61,24 @@ def build_state_model(model_cfg: dict[str, Any], in_channels: int, out_channels:
         hidden_channels=int(model_cfg.get("hidden_channels", 32)),
         hidden_layers=int(model_cfg.get("hidden_layers", 2)),
         kernel_size=int(model_cfg.get("kernel_size", 3)),
+        padding_mode=str(model_cfg.get("padding_mode", "zeros")),
     )
+
+
+def fixed_cell_mask(state: np.ndarray, train_indices: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Cells whose every state channel is constant over the training split (land), and their values."""
+
+    train_states = state[np.union1d(train_indices, train_indices + 1)]
+    mask = (train_states.min(axis=0) == train_states.max(axis=0)).all(axis=0)
+    return mask, train_states[0].astype("float32")
 
 
 def static_context(static_fields: list[str], state: np.ndarray, train_indices: np.ndarray, input_mean: np.ndarray, input_std: np.ndarray) -> np.ndarray | None:
     """Build normalised time-invariant input channels from the training split.
 
     - ``train_mean_state``: time-mean of the training states, normalised like the state inputs;
-    - ``coordinates``: y and x scaled to [-1, 1].
+    - ``coordinates``: y and x scaled to [-1, 1];
+    - ``land_mask``: 1 on cells that are constant over the training split, else 0.
     """
 
     channels: list[np.ndarray] = []
@@ -81,6 +91,8 @@ def static_context(static_fields: list[str], state: np.ndarray, train_indices: n
         elif name == "coordinates":
             yy, xx = np.meshgrid(np.linspace(-1.0, 1.0, ny), np.linspace(-1.0, 1.0, nx), indexing="ij")
             channels.append(np.stack([yy, xx]))
+        elif name == "land_mask":
+            channels.append(fixed_cell_mask(state, train_indices)[0][None].astype("float32"))
         else:
             raise ValueError(f"unknown static field {name!r}")
     return np.concatenate(channels).astype("float32") if channels else None
@@ -97,6 +109,7 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
         output_mean, output_std = norm.target_mean, norm.target_std
     static = static_context(static_fields or [], state, train_indices, norm.input_mean, norm.input_std)
     n_static = 0 if static is None else static.shape[0]
+    fixed_mask, fixed_values = fixed_cell_mask(state, train_indices) if model_cfg.get("fixed_land_cells", False) else (None, None)
     net = build_state_model(model_cfg, inputs.shape[1] + n_static, state.shape[1])
     return StateStepper(
         net,
@@ -107,6 +120,8 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
         target_mode=target_mode,
         mass_conserving=bool(model_cfg.get("mass_conserving", False)),
         static=static,
+        fixed_mask=fixed_mask,
+        fixed_values=fixed_values,
     )
 
 
@@ -244,6 +259,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
             "mass_conserving": stepper.mass_conserving,
             "unroll_steps": unroll_steps,
             "static_fields": static_fields,
+            "fixed_land_cells": bool(stepper.fixed_mask.numel()),
             "primary_metric": "layer-thickness MSE of fully autoregressive rollout (src/evaluation.py)",
         },
         "epochs": [],
