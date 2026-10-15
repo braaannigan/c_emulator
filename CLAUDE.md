@@ -4,7 +4,9 @@ Goal: find an ML emulator that produces stable, accurate, long-horizon
 autoregressive rollouts of a two-layer double-gyre ocean with a shifting wind
 (`double_gyre_shifting_wind_2layer`, acronym `dgsw2l`).
 
-To run the research loop, use the `autoresearch` skill (`/autoresearch`).
+Read `README.md` for the research objective, the system being emulated, the
+fixed evaluation, design principles and experiment conventions. To run the
+research loop, use the `autoresearch` skill (`/autoresearch`).
 
 ## Ground rules
 
