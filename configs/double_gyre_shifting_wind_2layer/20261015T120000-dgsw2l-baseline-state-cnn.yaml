@@ -12,7 +12,18 @@ experiment:
     wind stress to the next state establishes a first reference score for
     fully autoregressive rollouts on the two-layer double-gyre shifting-wind
     dataset.
-  conclusion: null
+  conclusion: >
+    Unstable. The 3-layer 32-channel CNN predicting the full next state in
+    normalised units blows up in every scheduled rollout (eval_mse_mean
+    8.5e21, 7.3e12, 8.2e7, 1.97e5 at epochs 5/10/15/20). Early lead-time
+    errors fall with training (step-1 MSE 36 -> 15 m^2) but errors compound
+    super-linearly. Far worse than trivial references on the same evaluator
+    window: persistence 298, training-mean climatology 134 (oracle constant
+    125). Diagnostics: total layer volume is exactly conserved in the data;
+    thickness anomalies decorrelate within ~5 steps (35 days) so the flow is
+    eddy-chaotic and the long-lead MSE floor for a deterministic forecast is
+    ~climatological variance (~134); the 40-day wind phase explains almost no
+    thickness variance at 7-day sampling.
 
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
