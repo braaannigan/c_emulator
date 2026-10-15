@@ -78,6 +78,9 @@ def test_build_state_model_uses_config_values():
     assert len(convs) == 4
     assert convs[0].out_channels == 5
     assert convs[0].kernel_size == (5, 5)
+    assert convs[0].padding_mode == "zeros"
+    reflect = build_state_model({"padding_mode": "reflect"}, 7, 6)
+    assert all(layer.padding_mode == "reflect" for layer in reflect.net if isinstance(layer, torch.nn.Conv2d))
 
 
 def test_learning_rate_helpers_and_device():

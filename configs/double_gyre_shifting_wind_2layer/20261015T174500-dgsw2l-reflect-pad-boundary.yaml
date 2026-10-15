@@ -1,0 +1,72 @@
+experiment:
+  id: 20261015T174500-dgsw2l-reflect-pad-boundary
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: reflect-pad-boundary
+  kind: bigger_jump
+  rationale: Checkpoint diagnosis of the static-context model shows the rollout blow-up is
+    seeded at the western wall and is grid-scale. Zero padding in normalised units tells every
+    conv that the field outside the closed basin equals the training mean (zero velocity anomaly,
+    mean thickness), a sharp artificial jump exactly where the western boundary current is
+    strongest.
+  hypothesis: Replacing zero padding with reflect padding in every conv layer (a Neumann-like
+    closed-wall boundary treatment, with the coordinate channels still marking wall position)
+    removes the western-wall grid-scale instability of the static-context unroll-8 residual
+    mass-conserving CNN, giving stable 143-step rollouts at every scheduled checkpoint.
+  conclusion: 'Rejected: no effect. Reflect padding gives rollouts nearly identical to zero
+    padding (epoch 5: 178.7 vs 178.1; final 7.2e7 vs 4.0e7) and the blow-up is still seeded
+    at x=0, y~186. Follow-up data inspection found the real boundary structure: the outer
+    ring (rows 0,1,198,199 and alternate rows of columns 0 and 99, 596 cells) is land, with
+    h=200 and u=v=0 fixed for all time, in a checkerboard along the side walls. The residual
+    model lets these cells drift, and the side-wall checkerboard is exactly where the grid-scale
+    instability starts. Next: hard land mask.'
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261015T174500-dgsw2l-reflect-pad-boundary.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+model:
+  type: state_cnn
+  hidden_channels: 32
+  hidden_layers: 2
+  kernel_size: 3
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  padding_mode: reflect
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '

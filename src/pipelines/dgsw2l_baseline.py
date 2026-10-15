@@ -61,6 +61,7 @@ def build_state_model(model_cfg: dict[str, Any], in_channels: int, out_channels:
         hidden_channels=int(model_cfg.get("hidden_channels", 32)),
         hidden_layers=int(model_cfg.get("hidden_layers", 2)),
         kernel_size=int(model_cfg.get("kernel_size", 3)),
+        padding_mode=str(model_cfg.get("padding_mode", "zeros")),
     )
 
 
