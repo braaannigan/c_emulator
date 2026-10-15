@@ -1,0 +1,64 @@
+experiment:
+  id: 20261015T160500-dgsw2l-residual-mass-cnn
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: residual-mass-cnn
+  kind: medium_step
+  rationale: Baseline blows up with super-linear error growth. Per-step increments are ~10x
+    smaller than the state std, so a full-state target wastes capacity reconstructing the
+    state and injects O(state) noise every step; layer volume is exactly conserved in the
+    data but not by the model.
+  hypothesis: Predicting the normalised one-step increment (residual target) and projecting
+    out the per-layer domain-mean thickness change (exact volume conservation) keeps the same
+    small CNN stable over the 143-step held-out rollout and beats persistence (297.7).
+  conclusion: 'Rejected: unstable. The residual target with exact layer-volume projection
+    greatly improves short-lead skill (step-1 thickness MSE 4.2 vs 15 for the baseline; step-5
+    ~70 vs 143) but the one-step-trained model still diverges exponentially in every scheduled
+    rollout (final 3.1e27), and divergence worsens with training. One-step MSE does not constrain
+    the error-propagation dynamics; next test multi-step unrolled training on top of this
+    recipe.'
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261015T160500-dgsw2l-residual-mass-cnn.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 1
+model:
+  type: state_cnn
+  hidden_channels: 32
+  hidden_layers: 2
+  kernel_size: 3
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '

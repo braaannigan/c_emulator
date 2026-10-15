@@ -7,11 +7,12 @@ import xarray as xr
 import yaml
 
 from src.config import load_config
-from src.data_state import fit_channel_normalisation
 from src.models.baseline_cnn import StateCNN
 from src.pipelines.dgsw2l_baseline import (
-    StateCNNEmulator,
     build_state_model,
+    build_stepper,
+    rollout_diagnostics,
+    unrolled_loss,
     current_learning_rate,
     decay_learning_rate,
     resolve_device,
@@ -86,20 +87,43 @@ def test_learning_rate_helpers_and_device():
     assert resolve_device("auto").type in {"cpu", "cuda", "mps"}
 
 
-def test_emulator_rollout_feeds_back_its_own_predictions():
-    inputs = np.ones((5, 7, 2, 2), dtype="float32")
-    state = np.ones((5, 6, 2, 2), dtype="float32")
-    norm = fit_channel_normalisation(inputs, state, np.array([0, 1, 2]))
+def test_build_stepper_selects_residual_increment_normalisation():
+    rng = np.random.default_rng(0)
+    state = rng.normal(size=(6, 6, 3, 3)).astype("float32")
+    inputs = np.concatenate([state, np.zeros((6, 1, 3, 3), dtype="float32")], axis=1)
+    idx = np.arange(4)
+    residual = build_stepper({"target_mode": "residual", "mass_conserving": True, "hidden_channels": 2, "hidden_layers": 1}, inputs, state, idx)
+    full = build_stepper({"hidden_channels": 2, "hidden_layers": 1}, inputs, state, idx)
+    delta = state[idx + 1] - state[idx]
+    np.testing.assert_allclose(residual.output_std.flatten().numpy(), delta.std(axis=(0, 2, 3)), rtol=1e-5)
+    np.testing.assert_allclose(full.output_std.flatten().numpy(), state[idx + 1].std(axis=(0, 2, 3)), rtol=1e-5)
+    assert residual.mass_conserving and residual.target_mode == "residual"
+    assert full.target_mode == "next_state" and not full.mass_conserving
 
-    class AddOne(torch.nn.Module):
+
+def test_unrolled_loss_averages_over_steps_and_feeds_back_predictions():
+    class Identity(torch.nn.Module):
         def forward(self, x):
-            return x[:, :6] + 1.0
+            return torch.zeros_like(x[:, :6])
 
-    emulator = StateCNNEmulator(AddOne(), norm, torch.device("cpu"))
-    pred = emulator.rollout(state[:2], np.zeros((5, 2, 2), dtype="float32"), 3)
+    from src.models.stepper import StateStepper
 
-    assert pred.shape == (3, 6, 2, 2)
-    np.testing.assert_allclose(pred[:, 0, 0, 0], [2.0, 3.0, 4.0])
+    stepper = StateStepper(Identity(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual")
+    states = torch.zeros(1, 3, 6, 2, 2)
+    states[:, 2] = 2.0
+    winds = torch.zeros(1, 2, 2, 2)
+    # Identity residual predicts the start state (0); errors are 0 then 2 -> mean (0 + 4) / 2.
+    assert float(unrolled_loss(stepper, states, winds)) == pytest.approx(2.0)
+
+
+def test_rollout_diagnostics_ratios():
+    rng = np.random.default_rng(0)
+    truth = rng.normal(size=(3, 6, 4, 4))
+    diag = rollout_diagnostics(truth, truth * 2.0)
+    assert diag["thickness_std_ratio_mean"] == pytest.approx(2.0)
+    assert diag["thickness_std_ratio_last"] == pytest.approx(2.0)
+    assert diag["kinetic_energy_ratio_mean"] == pytest.approx(4.0)
+    assert diag["kinetic_energy_ratio_last"] == pytest.approx(4.0)
 
 
 def test_run_experiment_smoke_writes_log_results_and_snapshot(tmp_path):
@@ -114,6 +138,7 @@ def test_run_experiment_smoke_writes_log_results_and_snapshot(tmp_path):
     assert len(rollout["eval_mse_by_time"]) == 3
     assert np.isfinite(rollout["eval_mse_mean"])
     assert "velocity_mse_mean" in rollout
+    assert "thickness_std_ratio_mean" in rollout
     assert (tmp_path / "rollout" / "tiny-latest-surface-thickness.nc").exists()
     assert config.results_csv.exists()
 
@@ -129,3 +154,16 @@ def test_run_experiment_full_saves_rollout_netcdf_when_enabled(tmp_path):
     with xr.open_dataset(result["rollout_path"]) as ds:
         assert ds["rollout_layer_thickness"].shape == ds["truth_layer_thickness"].shape
         assert "rollout_meridional_velocity_centered" in ds
+
+
+def test_run_experiment_residual_mass_conserving_unrolled(tmp_path):
+    config = write_config(tmp_path)
+    config.raw["model"].update({"target_mode": "residual", "mass_conserving": True})
+    config.raw["training"]["unroll_steps"] = 2
+
+    run_experiment(config, smoke_test=True)
+
+    log = json.loads(config.experiment_log.read_text())
+    assert log["metadata"]["unroll_steps"] == 2
+    assert log["metadata"]["target_mode"] == "residual"
+    assert log["metadata"]["mass_conserving"] is True

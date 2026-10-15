@@ -78,3 +78,39 @@ class NextStepStateDataset(Dataset):
 
 def dgsw2l_pair_split(n_times: int, train_fraction: float) -> tuple[np.ndarray, np.ndarray]:
     return chronological_pair_split(n_times, train_fraction)
+
+
+def fit_increment_normalisation(state: np.ndarray, indices: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Per-channel mean/std of one-step increments ``state[t+1] - state[t]`` over ``indices``."""
+
+    delta = state[indices + 1] - state[indices]
+    mean = delta.mean(axis=(0, 2, 3), dtype=np.float64).astype("float32")
+    std = delta.std(axis=(0, 2, 3), dtype=np.float64).astype("float32")
+    return mean, np.where(std < 1e-6, 1.0, std).astype("float32")
+
+
+class RolloutWindowDataset(Dataset):
+    """Windows of ``unroll_steps + 1`` consecutive physical states plus the wind at each start.
+
+    ``indices`` are next-step pair starts; only starts whose whole window stays
+    inside those pairs are used, so no target leaves the training split.
+    """
+
+    def __init__(self, state: np.ndarray, forcing: np.ndarray, indices: np.ndarray, unroll_steps: int = 1):
+        if unroll_steps < 1:
+            raise ValueError("unroll_steps must be at least 1")
+        last_target = int(indices.max()) + 1
+        self.starts = np.array([t for t in indices if t + unroll_steps <= last_target], dtype="int64")
+        if len(self.starts) == 0:
+            raise ValueError("no training window fits inside the training split")
+        self.state = state
+        self.forcing = forcing
+        self.unroll_steps = unroll_steps
+
+    def __len__(self) -> int:
+        return len(self.starts)
+
+    def __getitem__(self, item: int) -> tuple[torch.Tensor, torch.Tensor]:
+        t = int(self.starts[item])
+        k = self.unroll_steps
+        return torch.from_numpy(self.state[t : t + k + 1].astype("float32")), torch.from_numpy(self.forcing[t : t + k].astype("float32"))

@@ -27,7 +27,7 @@ def test_load_baseline_config_exposes_core_options():
     assert config.rollout_steps is None
     assert config.eval_interval_epochs == 5
     assert config.save_rollout_outputs is False
-    assert config.conclusion is None
+    assert config.conclusion.startswith("Unstable")
 
 
 def test_config_optional_values_are_cast_when_present():
