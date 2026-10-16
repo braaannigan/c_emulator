@@ -17,7 +17,16 @@ experiment:
     held-out spread/error ratio rises from ~0.01 to >= 0.3 over steps 1-26 and >= 0.5 beyond,
     with member realism <= ~0.8, drift <= ~0.2 and member eval_mse_mean within ~10% of the
     8x model.'
-  conclusion: null
+  conclusion: 'Not promoted, but a milestone: the first genuinely stochastic, calibrated ensemble.
+    Giving both CRPS members the same start perturbation forces spread through the noise inputs:
+    held-out spread/error ratio 1.49 over steps 1-26 (over-dispersive) and 0.95 beyond (calibrated),
+    vs ~0.01 for every earlier CRPS model. The 4-member ensemble mean scores eval_mse_mean
+    129.5 - below climatology (136.8) for the first time - but it is a smoothed product. Individual
+    members are worse forecasts: epochs 30-60 eval_mse_mean 200, final 188, predictable-range
+    MSE 40.5 (vs 17.5 for the 8x model), realism 0.97 (0.70), grid-noise excess 1.8 decades
+    (0.94), drift 0.26 (0.23). Likely cause of the early over-dispersion: in training the
+    shared start perturbation (1 increment-std) must be covered by learned spread, which is
+    too wide when evaluation starts from an unperturbed state.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
