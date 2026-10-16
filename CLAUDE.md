@@ -45,5 +45,6 @@ uv run python -m src.pipelines.dgsw2l_baseline --config <config>
 uv run python scripts/autoresearch_status.py
 uv run python scripts/fidelity_diagnostics.py --config <config> [--long-years 25]   # spectra, EKE maps, decorrelation, long-run drift
 uv run python scripts/runpod_run.py --config <config> [--ref <branch>]           # train on the RunPod endpoint (one job at a time)
+uv run python scripts/animate_emulator.py --config <config> [--mode long|held-out]  # MP4 of a rollout (skill: animate-rollout)
 uv run streamlit run src/viewer/training_metrics_viewer.py
 ```

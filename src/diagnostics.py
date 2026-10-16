@@ -156,6 +156,12 @@ def kinetic_energy_series(states: np.ndarray) -> np.ndarray:
     return 0.5 * (u**2 + v**2).mean(axis=(2, 3))
 
 
+def relative_vorticity(u: np.ndarray, v: np.ndarray, dx: float) -> np.ndarray:
+    """Relative vorticity dv/dx - du/dy of cell-centred velocities ``(..., y, x)`` by centred differences."""
+
+    return np.gradient(v, dx, axis=-1) - np.gradient(u, dx, axis=-2)
+
+
 def block_statistics(states: np.ndarray, block: int) -> dict[str, list[float]]:
     """Per-block (e.g. per-year) domain-mean KE and thickness std, to expose slow drift."""
 
