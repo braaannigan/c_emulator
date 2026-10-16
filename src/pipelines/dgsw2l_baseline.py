@@ -21,6 +21,7 @@ from src.models.baseline_cnn import StateCNN
 from src.models.stepper import StateStepper, StepperEmulator
 from src.models.unet import StateUNet
 from src.results import append_result
+from src.scorecard import scorecard, summarise
 
 
 def utc_now() -> str:
@@ -384,6 +385,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
                     "velocity_mse_by_time": [float(v) for v in result.velocity_mse_by_time],
                     "velocity_mse_mean": result.velocity_mse_mean,
                     **rollout_diagnostics(result.truth, result.prediction),
+                    "scorecard": scorecard(result.prediction, result.truth, result.thickness_mse_by_time),
                     "rollout_artifact": artifact,
                     "latest_surface_thickness_path": str(latest_surface_path),
                     **({"rollout_path": str(path)} if path is not None else {}),
@@ -395,6 +397,9 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
         write_json_log(config.experiment_log, log)
     if last_metrics is None:  # pragma: no cover - the final epoch always triggers a rollout
         raise RuntimeError("No rollout was produced")
+    log["scorecard_epochs_30_60"] = summarise(log["rollouts"])
+    log["scorecard_final"] = log["rollouts"][-1]["scorecard"]
+    write_json_log(config.experiment_log, log)
     if not smoke_test:
         checkpoint = config.results_csv.parent / "checkpoints" / f"{config.experiment_id}.pt"
         checkpoint.parent.mkdir(parents=True, exist_ok=True)

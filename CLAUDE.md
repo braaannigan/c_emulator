@@ -23,6 +23,18 @@ research loop, use the `autoresearch` skill (`/autoresearch`).
   held-out rollout, lower is better). Also watch `eval_mse_last` and
   `velocity_mse_mean`, and judge models on the whole sequence of scheduled
   rollouts, not one lucky checkpoint.
+- Secondary scorecard (`src/scorecard.py`, logged at every scheduled rollout
+  and by `scripts/fidelity_diagnostics.py`; all lower is better):
+  `predictable_mse` (thickness MSE over the first 26 steps, where skill
+  exists), `realism` (spectral error + EKE map amplitude/pattern error +
+  0.25 x grid-noise excess in decades) and the long-run `drift_score`.
+  `eval_mse_mean` is dominated by the chaotic tail and rewards smoothing, so
+  compare models with `scripts/scorecard_table.py` over several seeds.
+- Promotion rule (agreed with the user): promote a candidate when, averaged
+  over seeds, its `predictable_mse` or `realism`/`drift_score` clearly
+  improves and its multi-seed `eval_mse_mean` (epochs 30-60 and final) is
+  not worse by more than the seed noise (~5 for a 3-seed mean); physical
+  realism takes priority over tail MSE.
 
 ## Layout
 
@@ -43,6 +55,7 @@ uv run --extra dev pytest --cov=src --cov-report=term-missing
 uv run python -m src.pipelines.dgsw2l_baseline --config <config> --smoke-test
 uv run python -m src.pipelines.dgsw2l_baseline --config <config>
 uv run python scripts/autoresearch_status.py
+uv run python scripts/scorecard_table.py <id> [<id> ...]                       # benchmark + scorecard, seeds grouped
 uv run python scripts/fidelity_diagnostics.py --config <config> [--long-years 25]   # spectra, EKE maps, decorrelation, long-run drift
 uv run python scripts/runpod_run.py --config <config> [--ref <branch>]           # train on the RunPod endpoint (one job at a time)
 uv run python scripts/animate_emulator.py --config <config> [--mode long|held-out]  # MP4 of a rollout (skill: animate-rollout)
