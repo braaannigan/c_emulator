@@ -2,7 +2,7 @@
 # Worker start command for the runpod/pytorch base image: install the few
 # pipeline dependencies the image lacks, fetch the handler from main and serve.
 set -euo pipefail
-PIP_DEPS="runpod xarray netcdf4 pyyaml scipy"
+PIP_DEPS="runpod xarray netcdf4 pyyaml scipy matplotlib"
 # A venv layered on the system site-packages keeps the image's torch but lets
 # pip upgrade packages (e.g. cryptography) that Debian installed system-wide.
 python -m venv --system-site-packages /opt/venv
