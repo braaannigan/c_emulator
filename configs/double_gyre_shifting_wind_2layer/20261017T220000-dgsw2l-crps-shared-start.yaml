@@ -1,0 +1,86 @@
+experiment:
+  id: 20261017T220000-dgsw2l-crps-shared-start
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: crps-shared-start
+  kind: medium_step
+  rationale: 'Spread-skill check: the ''stochastic'' CRPS models are effectively deterministic
+    - 8 members of the 8x coarse-noise model (and 4 of the incumbent) have spread/error ratios
+    of 0.00-0.02 at all leads (calibrated = 1). In the two-member CRPS each member gets independent
+    start-state noise, so the spread term is satisfied by the start perturbation and the network
+    learns to ignore its noise channels, which then only add grid-scale noise. Giving both
+    members the same start perturbation removes that route: spread can only come from the
+    stochastic inputs, which should make the generator genuinely probabilistic (calibrated
+    ensemble, realistic member variability). Changed objective; RunPod, seed 42, with diagnostics
+    incl. the new 4-member spread-skill check.'
+  hypothesis: 'With a shared start perturbation the CRPS model becomes genuinely stochastic:
+    held-out spread/error ratio rises from ~0.01 to >= 0.3 over steps 1-26 and >= 0.5 beyond,
+    with member realism <= ~0.8, drift <= ~0.2 and member eval_mse_mean within ~10% of the
+    8x model.'
+  conclusion: 'Not promoted, but a milestone: the first genuinely stochastic, calibrated ensemble.
+    Giving both CRPS members the same start perturbation forces spread through the noise inputs:
+    held-out spread/error ratio 1.49 over steps 1-26 (over-dispersive) and 0.95 beyond (calibrated),
+    vs ~0.01 for every earlier CRPS model. The 4-member ensemble mean scores eval_mse_mean
+    129.5 - below climatology (136.8) for the first time - but it is a smoothed product. Individual
+    members are worse forecasts: epochs 30-60 eval_mse_mean 200, final 188, predictable-range
+    MSE 40.5 (vs 17.5 for the 8x model), realism 0.97 (0.70), grid-noise excess 1.8 decades
+    (0.94), drift 0.26 (0.23). Likely cause of the early over-dispersion: in training the
+    shared start perturbation (1 increment-std) must be covered by learned spread, which is
+    too wide when evaluation starts from an unperturbed state.'
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261017T220000-dgsw2l-crps-shared-start.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+  ema_decay: 0.998
+  loss: crps
+  crps_shared_start_noise: true
+model:
+  type: unet
+  hidden_channels: 32
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+  depth: 3
+  stochastic_channels: 4
+  increment_smoothing: 1.0
+  stochastic_scale: 8
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '

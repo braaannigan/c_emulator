@@ -1,0 +1,86 @@
+experiment:
+  id: 20261017T200000-dgsw2l-crps-layer-noise
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: crps-layer-noise
+  kind: medium_step
+  rationale: Fidelity diagnostics show the lower layer decorrelates too fast in long runs
+    (thickness e-folding 5.3-6.7 steps vs 9.7 in truth) and carries too little slow (multi-year)
+    variance (0.40-0.71 of truth). The start-state noise is 1 increment-std in every channel;
+    the lower layer's increments are small relative to its slow anomalies, so the same relative
+    perturbation may teach the model to damp genuine slow lower-layer signals. Halving the
+    lower-layer noise (h1, u1, v1) on the 8x coarse-noise candidate targets lower-layer memory.
+    RunPod, seed 42, with diagnostics.
+  hypothesis: Halving lower-layer start-state noise lengthens the long-run lower-layer e-folding
+    time toward the truth's 9.7 steps and raises its slow-band variance ratio, without worsening
+    realism (<= ~0.75), drift (<= ~0.2) or predictable-range MSE (within ~1 of 17.7 for seed
+    42).
+  conclusion: 'Rejected (target missed; single seed). Halving the start-state noise in the
+    lower layer (h1, u1, v1) on the 8x coarse-noise model does not lengthen lower-layer memory:
+    long-run lower-layer thickness e-folding 6.6 steps vs 7.2 for the 8x model (truth 9.7)
+    and slow-band variance 0.64 vs 0.74 (worse). Overall scorecard slightly better than the
+    8x model''s seed 42 but within single-seed noise: realism 0.68 vs 0.75, drift 0.08 vs
+    0.12, predictable-range MSE 17.3 vs 17.7, eval_mse_mean 151 / 154 (epochs 30-60 / final)
+    vs 153 / 151.'
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261017T200000-dgsw2l-crps-layer-noise.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std:
+  - 1.0
+  - 0.5
+  - 1.0
+  - 0.5
+  - 1.0
+  - 0.5
+  ema_decay: 0.998
+  loss: crps
+model:
+  type: unet
+  hidden_channels: 32
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+  depth: 3
+  stochastic_channels: 4
+  increment_smoothing: 1.0
+  stochastic_scale: 8
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '

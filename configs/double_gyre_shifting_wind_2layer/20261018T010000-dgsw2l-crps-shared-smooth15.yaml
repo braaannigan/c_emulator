@@ -14,7 +14,14 @@ experiment:
   hypothesis: Smoothing sigma 1.5 removes the long-run drift of the shared-start model (finite
     upper-layer e-folding, drift score <= 0.15, no persistent western-boundary anomalies)
     while keeping spread/error within 0.6-1.3 and member realism <= ~0.95.
-  conclusion: null
+  conclusion: 'Mislabelled run: it was launched from main, which did not yet have crps_shared_start_noise,
+    so the flag was ignored. What actually ran: the 32-channel coarse-noise-8 CRPS model with
+    smoothing sigma 1.5 and independent per-member start noise of 0.5 (vs 1.0 in the old incumbent).
+    Result (seed 42): best realism so far, 0.657, with noise excess 0.70 decades and drift
+    0.032; final MSE 123 (lowest single final) and 30-60 MSE 149; but predictable-range MSE
+    is 20.9 (32-ch coarse8 4 seeds: 17.5), so the extra smoothing costs short-range skill.
+    The shared-start code is now merged to main; the genuine shared-start + sigma 1.5 test
+    is re-queued as 20261018T020000-dgsw2l-crps-shared-smooth15b.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

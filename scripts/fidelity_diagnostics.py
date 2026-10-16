@@ -43,6 +43,7 @@ from src.diagnostics import (  # noqa: E402
     autocorrelation,
     block_statistics,
     compare_statistics,
+    spread_skill,
     eke_map,
     extended_forcing,
     kinetic_energy_series,
@@ -155,6 +156,7 @@ def main() -> None:
     parser.add_argument("--long-years", type=float, default=25.0)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--members", type=int, default=4, help="Ensemble members for the spread-skill check of stochastic models")
     args = parser.parse_args()
     torch.manual_seed(args.seed)
 
@@ -190,6 +192,15 @@ def main() -> None:
     plot_maps(out_dir / "maps_held_out.png", held_out.prediction, held_out.truth, f"{experiment_id}: held-out period")
     plot_autocorrelation(out_dir / "autocorrelation_held_out.png", held_out.prediction, held_out.truth, "held-out period")
 
+    if getattr(emulator.stepper, "stochastic_channels", 0):
+        # Stochastic emulators: is the ensemble actually spread out (calibrated ~1)?
+        start = int(eval_indices[0])
+        members = []
+        for member in range(args.members):
+            torch.manual_seed(1000 + member)
+            members.append(np.asarray(emulator.rollout(state[: start + 1], forcing[: start + 1 + len(held_out.prediction)], len(held_out.prediction)), dtype="float32"))
+        report["held_out"]["ensemble"] = {"members": args.members, **spread_skill(np.stack(members), held_out.truth)}
+
     long_steps = int(round(args.long_years * STEPS_PER_YEAR))
     long_times, long_forcing = extended_forcing(source, long_steps)
     long_run = np.asarray(emulator.rollout(state, long_forcing, long_steps), dtype="float32")
@@ -218,6 +229,9 @@ def print_summary(report: dict) -> None:
     card = report["held_out"].get("scorecard")
     if card:
         print("== scorecard (held-out, lower is better): " + ", ".join(f"{k} {v:.3g}" for k, v in card.items()))
+    ensemble = report["held_out"].get("ensemble")
+    if ensemble:
+        print("== ensemble: " + ", ".join(f"{k} {v:.3g}" for k, v in ensemble.items()))
     drift = report["long_run"].get("drift")
     if drift:
         print("== long-run drift: " + ", ".join(f"{k} {v:.3g}" for k, v in drift.items()))

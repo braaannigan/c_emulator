@@ -157,3 +157,17 @@ def test_relative_vorticity_of_solid_body_rotation_is_twice_the_rate():
     u, v = -omega * y, omega * x  # counter-clockwise rotation
     np.testing.assert_allclose(relative_vorticity(u, v, 1.0), 2 * omega)
     np.testing.assert_allclose(relative_vorticity(u, v, 2.0), omega)
+
+
+def test_spread_skill_is_one_for_a_calibrated_ensemble_and_zero_for_identical_members():
+    from src.diagnostics import spread_skill
+
+    rng = np.random.default_rng(0)
+    truth = rng.normal(size=(40, 6, 8, 8))
+    calibrated = rng.normal(size=(30, 40, 6, 8, 8))  # truth and members drawn from the same distribution
+    stats = spread_skill(calibrated, truth, split=20)
+    assert stats["spread_error_ratio_short"] == pytest.approx(1.0, abs=0.1)
+    assert stats["spread_error_ratio_long"] == pytest.approx(1.0, abs=0.1)
+    identical = np.repeat(calibrated[:1], 4, axis=0)
+    assert spread_skill(identical, truth)["spread_error_ratio_short"] == 0.0
+    assert np.isnan(spread_skill(calibrated[:, :10], truth[:10], split=26)["spread_error_ratio_long"])
