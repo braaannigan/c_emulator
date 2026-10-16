@@ -229,6 +229,7 @@ def train_one_epoch(
     noise_std: float = 0.0,
     ema: AveragedModel | None = None,
     loss_name: str = "mse",
+    reconstruct_only: bool = False,
 ) -> float:
     stepper.train()
     losses: list[float] = []
@@ -236,7 +237,9 @@ def train_one_epoch(
         states = states.to(device)
         winds = winds.to(device)
         optimiser.zero_grad(set_to_none=True)
-        if isinstance(stepper, LatentModel):
+        if isinstance(stepper, LatentModel) and reconstruct_only:
+            loss = stepper.reconstruction_loss(states)
+        elif isinstance(stepper, LatentModel):
             loss = stepper.window_loss(states, winds, noise_std)
         else:
             loss = (unrolled_crps_loss if loss_name == "crps" else unrolled_loss)(stepper, states, winds, noise_std)
@@ -358,6 +361,8 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
             "ema_decay": config.raw.get("training", {}).get("ema_decay"),
             "input_noise_std": noise_std,
             "training_loss": loss_name,
+            "latent_pretrain_epochs": config.raw.get("training", {}).get("latent_pretrain_epochs"),
+            "latent_freeze_autoencoder": config.raw.get("training", {}).get("latent_freeze_autoencoder"),
             "stochastic_channels": stepper.stochastic_channels,
             "static_fields": static_fields,
             "fixed_land_cells": bool(stepper.fixed_mask.numel()),
@@ -376,9 +381,16 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     ema = None if ema_decay is None else AveragedModel(stepper, multi_avg_fn=get_ema_multi_avg_fn(float(ema_decay)))
     eval_stepper = stepper if ema is None else ema.module
     emulator = LatentEmulator(eval_stepper, device) if latent else StepperEmulator(eval_stepper, device)
+    # Latent models can pre-train the autoencoder on reconstruction alone, then
+    # (optionally) freeze it while the latent stepper is trained.
+    pretrain_epochs = int(config.raw.get("training", {}).get("latent_pretrain_epochs", 0)) if latent else 0
+    freeze_autoencoder = bool(config.raw.get("training", {}).get("latent_freeze_autoencoder", False)) and latent
     for epoch in range(1, epochs + 1):
+        if freeze_autoencoder and epoch == pretrain_epochs + 1:
+            for parameter in stepper.autoencoder_parameters():
+                parameter.requires_grad_(False)
         started = time.perf_counter()
-        loss = train_one_epoch(stepper, loader, optimiser, device, gradient_clip_norm=config.gradient_clip_norm, noise_std=noise_std, ema=ema, loss_name=loss_name)
+        loss = train_one_epoch(stepper, loader, optimiser, device, gradient_clip_norm=config.gradient_clip_norm, noise_std=noise_std, ema=ema, loss_name=loss_name, reconstruct_only=epoch <= pretrain_epochs)
         elapsed = time.perf_counter() - started
         log["epochs"].append(
             {

@@ -1,0 +1,74 @@
+experiment:
+  id: 20261016T220000-dgsw2l-latent-pretrained
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: latent-pretrained
+  kind: bigger_jump
+  rationale: User-chosen second latent attempt. The 12x-compressed latent model had a reconstruction
+    floor of step-1 MSE ~12 (grid models 0.8) and drifted late in rollouts. Halving the compression
+    per axis (latent 50x25x32, ~3x compression) should let the autoencoder keep eddy-scale
+    structure, and pre-training it for 20 epochs on reconstruction alone, then freezing it
+    while the latent stepper trains for 60 epochs with latent noise (0.3), separates representation
+    learning from dynamics learning, so the stepper cannot push the decoder into compensating
+    for its own errors.
+  hypothesis: 'With a 50x25x32 latent, a 20-epoch reconstruction-only pre-training and a frozen
+    autoencoder, the latent model reaches step-1 MSE below ~3, keeps every scheduled rollout
+    from epoch 40 bounded with KE and h-std ratios within 0.8-1.2, and its epochs 50-80 eval_mse_mean
+    is below ~170 (CRPS incumbent seed-42 epochs 30-60: 144.0).'
+  conclusion: null
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261016T220000-dgsw2l-latent-pretrained.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 80
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+  ema_decay: 0.998
+  latent_pretrain_epochs: 20
+  latent_freeze_autoencoder: true
+model:
+  type: latent
+  hidden_channels: 32
+  loss: mse
+  fixed_land_cells: true
+  latent_channels: 32
+  latent_levels: 2
+  stepper_channels: 64
+  stepper_depth: 2
+  latent_noise_std: 0.3
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '

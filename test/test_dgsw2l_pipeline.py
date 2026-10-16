@@ -333,3 +333,13 @@ def test_run_experiment_latent_model(tmp_path):
     run_experiment(config, smoke_test=True)
     meta = json.loads(config.experiment_log.read_text())["metadata"]
     assert meta["model_type"] == "latent" and meta["target_mode"] == "latent"
+
+
+def test_run_experiment_latent_pretrain_then_freeze(tmp_path):
+    config = write_config(tmp_path)
+    config.raw["model"] = {"type": "latent", "latent_channels": 2, "hidden_channels": 2, "latent_levels": 1, "stepper_channels": 2, "stepper_depth": 1}
+    config.raw["training"].update({"unroll_steps": 2, "latent_pretrain_epochs": 1, "latent_freeze_autoencoder": True})
+    config.raw["runtime"]["epochs"] = 2
+    run_experiment(config)
+    meta = json.loads(config.experiment_log.read_text())["metadata"]
+    assert meta["latent_pretrain_epochs"] == 1 and meta["latent_freeze_autoencoder"] is True

@@ -79,3 +79,14 @@ def test_latent_noise_changes_the_rollout_loss():
     torch.manual_seed(1)
     b = noisy.window_loss(states, winds)
     assert float(a) != float(b)
+
+
+def test_reconstruction_loss_trains_only_the_autoencoder():
+    torch.manual_seed(0)
+    model = make()
+    loss = model.reconstruction_loss(torch.randn(2, 3, 6, 16, 8))
+    loss.backward()
+    assert torch.isfinite(loss)
+    assert all(p.grad is not None for p in model.autoencoder_parameters())
+    assert all(p.grad is None for p in model.stepper.parameters())
+    assert len(model.autoencoder_parameters()) + len(list(model.stepper.parameters())) == len(list(model.parameters()))

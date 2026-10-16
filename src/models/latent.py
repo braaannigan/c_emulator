@@ -120,6 +120,17 @@ class LatentModel(nn.Module):
             return (h * wet).sum(dim=(2, 3), keepdim=True) / wet.sum()
         return h.mean(dim=(2, 3), keepdim=True)
 
+    def autoencoder_parameters(self) -> list[nn.Parameter]:
+        modules = [*self.encoders, self.to_latent, self.from_latent, *self.decoders, self.head]
+        return [p for module in modules for p in module.parameters()]
+
+    def reconstruction_loss(self, states: torch.Tensor) -> torch.Tensor:
+        """Autoencoder-only loss over every state in the window (output-std units)."""
+
+        frames = states.flatten(0, 1)
+        decoded = self.decode(self.encode(frames), tuple(states.shape[-2:]), self.wet_volume(frames))
+        return (((decoded - frames) / self.output_std) ** 2).mean()
+
     def window_loss(self, states: torch.Tensor, winds: torch.Tensor, noise_std: float = 0.0) -> torch.Tensor:
         """Reconstruction of the start state plus decoded unrolled-rollout MSE (output-std units).
 
