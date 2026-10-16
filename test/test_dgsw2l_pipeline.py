@@ -173,6 +173,9 @@ def test_run_experiment_residual_mass_conserving_unrolled(tmp_path):
     assert log["metadata"]["unroll_steps"] == 2
     assert log["metadata"]["target_mode"] == "residual"
     assert log["metadata"]["mass_conserving"] is True
+    assert {"predictable_mse", "realism", "spectral_error"} <= set(log["rollouts"][-1]["scorecard"])
+    assert log["scorecard_final"] == log["rollouts"][-1]["scorecard"]
+    assert "scorecard_epochs_30_60" in log
 
 
 def test_static_context_channels_and_stepper_input_width():

@@ -50,6 +50,7 @@ from src.diagnostics import (  # noqa: E402
     wavenumber_spectrum,
 )
 from src.evaluation import N_LAYERS, STATE_CHANNELS, evaluate_rollout  # noqa: E402
+from src.scorecard import drift_score, scorecard  # noqa: E402
 from src.models.stepper import StepperEmulator  # noqa: E402
 from src.pipelines.dgsw2l_baseline import build_stepper, resolve_device  # noqa: E402
 
@@ -182,6 +183,7 @@ def main() -> None:
             "eval_mse_last": held_out.eval_mse_last,
             "velocity_mse_mean": held_out.velocity_mse_mean,
             "statistics": compare_statistics(held_out.prediction, held_out.truth, eval_times, eval_times, period),
+            "scorecard": scorecard(held_out.prediction, held_out.truth, held_out.thickness_mse_by_time),
         },
     }
     plot_spectra(out_dir / "spectra_held_out.png", {"held-out": (held_out.prediction, held_out.truth)}, f"{experiment_id}: held-out period (143 steps)")
@@ -200,6 +202,7 @@ def main() -> None:
         "yearly_blocks": block_statistics(long_run, STEPS_PER_YEAR),
         "truth_yearly_blocks": block_statistics(state, STEPS_PER_YEAR),
     }
+    report["long_run"]["drift"] = drift_score(report["long_run"]["yearly_blocks"]["kinetic_energy"], report["long_run"]["truth_yearly_blocks"]["kinetic_energy"])
     plot_spectra(out_dir / "spectra_long_run.png", {"long run": (long_run, state)}, f"{experiment_id}: {args.long_years:g}-year free run vs full record")
     plot_maps(out_dir / "maps_long_run.png", long_run, state, f"{experiment_id}: {args.long_years:g}-year free run vs full record")
     plot_autocorrelation(out_dir / "autocorrelation_long_run.png", long_run, state, "long free run vs full record")
@@ -212,6 +215,12 @@ def main() -> None:
 
 
 def print_summary(report: dict) -> None:
+    card = report["held_out"].get("scorecard")
+    if card:
+        print("== scorecard (held-out, lower is better): " + ", ".join(f"{k} {v:.3g}" for k, v in card.items()))
+    drift = report["long_run"].get("drift")
+    if drift:
+        print("== long-run drift: " + ", ".join(f"{k} {v:.3g}" for k, v in drift.items()))
     for section, key in (("held_out", "statistics"), ("long_run", "statistics_vs_full_record")):
         stats = report[section][key]
         print(f"== {section}: KE ratio {stats['kinetic_energy_ratio']:.2f}, thickness std ratio {stats['thickness_std_ratio']:.2f}")
