@@ -356,3 +356,29 @@ def test_run_experiment_accepts_per_channel_noise(tmp_path):
     config.raw["training"]["input_noise_std"] = [1.0, 0.5, 1.0, 0.5, 1.0, 0.5]
     run_experiment(config, smoke_test=True)
     assert json.loads(config.experiment_log.read_text())["metadata"]["input_noise_std"] == [1.0, 0.5, 1.0, 0.5, 1.0, 0.5]
+
+
+def test_crps_shared_start_noise_gives_identical_members_without_stochastic_inputs():
+    from src.models.stepper import StateStepper
+
+    class Zero(torch.nn.Module):
+        def forward(self, x):
+            return torch.zeros_like(x[:, :6])
+
+    stepper = StateStepper(Zero(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual")
+    states = torch.zeros(1, 2, 6, 3, 3)
+    winds = torch.zeros(1, 1, 3, 3)
+    torch.manual_seed(0)
+    independent = float(unrolled_crps_loss(stepper, states, winds, 1.0))
+    torch.manual_seed(0)
+    shared = float(unrolled_crps_loss(stepper, states, winds, 1.0, shared_start_noise=True))
+    # Shared noise: members identical, so CRPS = MAE with no spread credit; independent members earn spread credit.
+    assert shared > independent > 0
+
+
+def test_run_experiment_logs_shared_start_noise(tmp_path):
+    config = write_config(tmp_path)
+    config.raw["model"].update({"target_mode": "residual", "stochastic_channels": 1})
+    config.raw["training"].update({"loss": "crps", "crps_shared_start_noise": True, "input_noise_std": 1.0})
+    run_experiment(config, smoke_test=True)
+    assert json.loads(config.experiment_log.read_text())["metadata"]["crps_shared_start_noise"] is True

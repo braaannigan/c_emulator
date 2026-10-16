@@ -162,6 +162,27 @@ def relative_vorticity(u: np.ndarray, v: np.ndarray, dx: float) -> np.ndarray:
     return np.gradient(v, dx, axis=-1) - np.gradient(u, dx, axis=-2)
 
 
+def spread_skill(ensemble: np.ndarray, truth: np.ndarray, split: int = 26) -> dict[str, float]:
+    """Ensemble spread vs ensemble-mean error of layer thickness.
+
+    ``ensemble`` is ``(members, time, channels, y, x)``. Spread is the
+    unbiased member variance scaled by (M + 1) / M, so a calibrated ensemble
+    has spread/error ~ 1; ratios are reported for leads up to ``split`` and after.
+    """
+
+    members = ensemble.shape[0]
+    h = ensemble[:, :, :N_LAYERS].astype(np.float64)
+    t = truth[:, :N_LAYERS].astype(np.float64)
+    error = ((h.mean(axis=0) - t) ** 2).mean(axis=(1, 2, 3))
+    spread = h.var(axis=0, ddof=1).mean(axis=(1, 2, 3)) * (members + 1) / members
+    return {
+        "spread_error_ratio_short": float(spread[:split].mean() / error[:split].mean()),
+        "spread_error_ratio_long": float(spread[split:].mean() / error[split:].mean()) if len(error) > split else float("nan"),
+        "ensemble_mean_mse": float(error.mean()),
+        "member_mse": float(((h - t) ** 2).mean()),
+    }
+
+
 def block_statistics(states: np.ndarray, block: int) -> dict[str, list[float]]:
     """Per-block (e.g. per-year) domain-mean KE and thickness std, to expose slow drift."""
 

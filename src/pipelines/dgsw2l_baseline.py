@@ -181,7 +181,7 @@ def unrolled_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tens
     return loss / steps
 
 
-def unrolled_crps_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tensor, noise_std: NoiseStd = 0.0) -> torch.Tensor:
+def unrolled_crps_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tensor, noise_std: NoiseStd = 0.0, shared_start_noise: bool = False) -> torch.Tensor:
     """Fair CRPS of a two-member ensemble, averaged over unrolled steps.
 
     Each window is rolled out twice with independent stochastic inputs (and
@@ -195,7 +195,12 @@ def unrolled_crps_loss(stepper: StateStepper, states: torch.Tensor, winds: torch
     pair_states = states.repeat(2, 1, 1, 1, 1)
     current = pair_states[:, 0]
     if has_noise(noise_std):
-        noise = torch.randn_like(current) * stepper.output_std * noise_std
+        # With shared_start_noise both members get the same start perturbation,
+        # so any spread between them must come from the stochastic inputs.
+        draw = current[:batch] if shared_start_noise else current
+        noise = torch.randn_like(draw) * stepper.output_std * noise_std
+        if shared_start_noise:
+            noise = noise.repeat(2, 1, 1, 1)
         if stepper.fixed_mask.numel():
             noise = noise.masked_fill(stepper.fixed_mask, 0.0)
         current = current + noise
@@ -220,6 +225,7 @@ def train_one_epoch(
     noise_std: NoiseStd = 0.0,
     ema: AveragedModel | None = None,
     loss_name: str = "mse",
+    shared_start_noise: bool = False,
 ) -> float:
     stepper.train()
     losses: list[float] = []
@@ -227,7 +233,10 @@ def train_one_epoch(
         states = states.to(device)
         winds = winds.to(device)
         optimiser.zero_grad(set_to_none=True)
-        loss = (unrolled_crps_loss if loss_name == "crps" else unrolled_loss)(stepper, states, winds, noise_std)
+        if loss_name == "crps":
+            loss = unrolled_crps_loss(stepper, states, winds, noise_std, shared_start_noise)
+        else:
+            loss = unrolled_loss(stepper, states, winds, noise_std)
         loss.backward()
         if gradient_clip_norm is not None:
             torch.nn.utils.clip_grad_norm_(stepper.parameters(), gradient_clip_norm)
@@ -313,6 +322,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     noise_cfg = config.raw.get("training", {}).get("input_noise_std", 0.0)
     noise_std = parse_noise_std(noise_cfg, device)
     loss_name = str(config.raw.get("training", {}).get("loss", "mse"))
+    shared_start_noise = bool(config.raw.get("training", {}).get("crps_shared_start_noise", False))
     if loss_name not in {"mse", "crps"}:
         raise ValueError(f"unknown training loss {loss_name!r}")
     dataset = RolloutWindowDataset(state, forcing, train_indices, unroll_steps)
@@ -345,6 +355,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
             "ema_decay": config.raw.get("training", {}).get("ema_decay"),
             "input_noise_std": noise_cfg,
             "training_loss": loss_name,
+            "crps_shared_start_noise": shared_start_noise,
             "stochastic_channels": stepper.stochastic_channels,
             "increment_smoothing": float(model_cfg.get("increment_smoothing", 0.0)),
             "stochastic_scale": stepper.stochastic_scale,
@@ -367,7 +378,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     emulator = StepperEmulator(eval_stepper, device)
     for epoch in range(1, epochs + 1):
         started = time.perf_counter()
-        loss = train_one_epoch(stepper, loader, optimiser, device, gradient_clip_norm=config.gradient_clip_norm, noise_std=noise_std, ema=ema, loss_name=loss_name)
+        loss = train_one_epoch(stepper, loader, optimiser, device, gradient_clip_norm=config.gradient_clip_norm, noise_std=noise_std, ema=ema, loss_name=loss_name, shared_start_noise=shared_start_noise)
         elapsed = time.perf_counter() - started
         log["epochs"].append(
             {
