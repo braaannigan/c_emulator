@@ -17,7 +17,15 @@ experiment:
     0.85, and its seed-42 epochs 30-60 eval_mse_mean is below the deterministic EMA incumbent's
     seed-42 run (156.0) and within ~6 of the CRPS incumbent's (144.0); a clear win (below
     ~138) would justify more seeds.
-  conclusion: null
+  conclusion: 'Failed: unstable. The latent reduced-order emulator (12x compression to 25x12x32,
+    latent U-Net stepper, decoder with land pinning and volume restoration) never matches
+    the grid-space models at short leads (epoch 60: step-1 MSE 3.1 vs 0.8, limited by reconstruction)
+    and its latent dynamics blow up beyond ~20-50 steps at every scheduled rollout from epoch
+    15 (final eval_mse_mean 1.0e4, KE ratio up to ~590 at the last step). Start-state noise
+    is absorbed by the contractive encoder, so the latent stepper never learns to damp perturbations
+    of its own latent state, and 8-step training does not constrain long-horizon latent growth,
+    the same failure mode the grid-space models had before noise injection. A follow-up should
+    inject noise in latent space.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
