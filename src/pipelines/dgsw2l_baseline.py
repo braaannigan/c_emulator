@@ -135,6 +135,7 @@ def build_latent_model(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.
         levels=int(model_cfg.get("latent_levels", 3)),
         stepper_channels=int(model_cfg.get("stepper_channels", 64)),
         stepper_depth=int(model_cfg.get("stepper_depth", 2)),
+        latent_noise_std=float(model_cfg.get("latent_noise_std", 0.0)),
     )
 
 

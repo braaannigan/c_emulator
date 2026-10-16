@@ -5,7 +5,7 @@ import torch
 from src.models.latent import LatentEmulator, LatentModel
 
 
-def make(mask=None, static=True, levels=2):
+def make(mask=None, static=True, levels=2, latent_noise_std=0.0):
     values = None
     if mask is not None:
         values = np.zeros((6, 16, 8), dtype="float32")
@@ -13,7 +13,7 @@ def make(mask=None, static=True, levels=2):
     return LatentModel(
         np.full(6, 0.0), np.ones(6), 0.0, 1.0, np.ones(6),
         static=np.zeros((2, 16, 8), dtype="float32") if static else None,
-        fixed_mask=mask, fixed_values=values, latent_channels=4, hidden_channels=4, levels=levels, stepper_channels=4, stepper_depth=1,
+        fixed_mask=mask, fixed_values=values, latent_channels=4, hidden_channels=4, levels=levels, stepper_channels=4, stepper_depth=1, latent_noise_std=latent_noise_std,
     )
 
 
@@ -65,3 +65,17 @@ def test_latent_emulator_rollout_shape():
     history = np.zeros((3, 6, 16, 8), dtype="float32")
     pred = LatentEmulator(model, torch.device("cpu")).rollout(history, np.zeros((7, 16, 8), dtype="float32"), 4)
     assert pred.shape == (4, 6, 16, 8)
+
+
+def test_latent_noise_changes_the_rollout_loss():
+    states = torch.randn(2, 3, 6, 16, 8)
+    winds = torch.zeros(2, 2, 16, 8)
+    torch.manual_seed(0)
+    clean = make(latent_noise_std=0.0)
+    torch.manual_seed(0)
+    noisy = make(latent_noise_std=1.0)
+    torch.manual_seed(1)
+    a = clean.window_loss(states, winds)
+    torch.manual_seed(1)
+    b = noisy.window_loss(states, winds)
+    assert float(a) != float(b)

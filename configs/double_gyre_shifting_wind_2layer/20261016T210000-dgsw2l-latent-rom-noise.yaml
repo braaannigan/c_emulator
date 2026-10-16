@@ -1,0 +1,70 @@
+experiment:
+  id: 20261016T210000-dgsw2l-latent-rom-noise
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: latent-rom-noise
+  kind: tuning
+  rationale: Follow-up to the latent reduced-order model, which blew up beyond ~20-50 steps
+    because start-state noise is absorbed by the encoder and the latent stepper never learns
+    to damp perturbations of its own latent state. Grid-space models were stabilised by noise
+    injection of ~1 increment-std, about 0.3 of the state's spread; the same relative perturbation
+    (0.3 of the latent spread) is now applied directly to the latent start state. Single seed
+    (42).
+  hypothesis: Latent noise injection (0.3 of the latent spread) keeps every scheduled rollout
+    of the latent model bounded with KE and h-std ratios within 0.8-1.1; if bounded, its seed-42
+    epochs 30-60 eval_mse_mean is below ~170.
+  conclusion: null
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261016T210000-dgsw2l-latent-rom-noise.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+  ema_decay: 0.998
+model:
+  type: latent
+  hidden_channels: 32
+  loss: mse
+  fixed_land_cells: true
+  latent_channels: 32
+  latent_levels: 3
+  stepper_channels: 64
+  stepper_depth: 2
+  latent_noise_std: 0.3
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '

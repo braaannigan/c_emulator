@@ -327,7 +327,7 @@ def test_crps_start_noise_spares_fixed_land_cells():
 
 def test_run_experiment_latent_model(tmp_path):
     config = write_config(tmp_path)
-    config.raw["model"] = {"type": "latent", "latent_channels": 2, "hidden_channels": 2, "latent_levels": 1, "stepper_channels": 2, "stepper_depth": 1, "fixed_land_cells": True}
+    config.raw["model"] = {"type": "latent", "latent_channels": 2, "hidden_channels": 2, "latent_levels": 1, "stepper_channels": 2, "stepper_depth": 1, "fixed_land_cells": True, "latent_noise_std": 0.5}
     config.raw["inputs"] = {"static_fields": ["coordinates"]}
     config.raw["training"].update({"unroll_steps": 2, "input_noise_std": 1.0})
     run_experiment(config, smoke_test=True)

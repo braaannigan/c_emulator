@@ -34,6 +34,7 @@ class LatentModel(nn.Module):
         levels: int = 3,
         stepper_channels: int = 64,
         stepper_depth: int = 2,
+        latent_noise_std: float = 0.0,
     ):
         super().__init__()
         if levels < 1:
@@ -50,6 +51,7 @@ class LatentModel(nn.Module):
         self.register_buffer("fixed_values", torch.zeros(0) if fixed_values is None else torch.as_tensor(fixed_values, dtype=torch.float32)[None])
         n_static = 0 if static is None else static.shape[0]
         self.levels = levels
+        self.latent_noise_std = float(latent_noise_std)
         widths = [hidden_channels * 2**level for level in range(levels)]
         self.encoders = nn.ModuleList()
         previous = n_state + n_static
@@ -119,7 +121,10 @@ class LatentModel(nn.Module):
         return h.mean(dim=(2, 3), keepdim=True)
 
     def window_loss(self, states: torch.Tensor, winds: torch.Tensor, noise_std: float = 0.0) -> torch.Tensor:
-        """Reconstruction of the start state plus decoded unrolled-rollout MSE (output-std units)."""
+        """Reconstruction of the start state plus decoded unrolled-rollout MSE (output-std units).
+
+        With ``latent_noise_std`` the latent start state is perturbed before the rollout.
+        """
 
         start = states[:, 0]
         volume = self.wet_volume(start)
@@ -131,6 +136,10 @@ class LatentModel(nn.Module):
         shape = tuple(states.shape[-2:])
         latent = self.encode(start)
         loss = (((self.decode(latent, shape, volume) - states[:, 0]) / self.output_std) ** 2).mean()
+        if self.latent_noise_std > 0:
+            # Perturb the latent state itself (scaled by its spread), so the
+            # latent stepper learns to damp errors in its own coordinates.
+            latent = latent + torch.randn_like(latent) * latent.detach().std() * self.latent_noise_std
         steps = winds.shape[1]
         for k in range(steps):
             latent = self.step(latent, winds[:, k])
