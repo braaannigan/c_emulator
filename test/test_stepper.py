@@ -116,3 +116,16 @@ def test_increment_smoothing_spreads_spikes_and_spares_land():
     out = plain(torch.zeros(1, 6, 9, 9), torch.zeros(1, 9, 9))
     torch.testing.assert_close(out[:, :2].mean(dim=(2, 3)), torch.zeros(1, 2), atol=1e-6, rtol=0)
     assert float(out[0, 2, 4, 4]) < 0.5
+
+
+def test_checkpoints_load_with_or_without_the_smoothing_kernel():
+    def build():
+        return StateStepper(AddOne(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), increment_smoothing=1.0)
+
+    state = build().state_dict()
+    assert "smoothing_kernel" not in state
+    build().load_state_dict(state)
+    legacy = dict(state, smoothing_kernel=torch.ones(1))  # written when the kernel was persistent
+    restored = build()
+    restored.load_state_dict(legacy)
+    assert restored.smoothing_kernel.numel() == 7
