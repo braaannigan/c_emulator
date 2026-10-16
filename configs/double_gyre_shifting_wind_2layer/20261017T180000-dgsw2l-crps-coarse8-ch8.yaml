@@ -22,7 +22,10 @@ experiment:
     0.90-0.93 of the full record, and the held-out period is more energetic than the training
     climate (thickness variance 136 vs 125): the held-out EKE deficit largely reflects a free
     run relaxing to the model climate from an energetic period, which no emulator without
-    eval-period information can match.'
+    eval-period information can match. Seed 7 (recovered from the volume after the API lost
+    the job) removes the short-range gain: 2-seed predictable-range MSE 17.4 vs 17.5 for the
+    8x incumbent (4 seeds), realism 0.76 vs 0.70, epochs 30-60 / final 150 / 159 vs 152.5
+    / 157.6, drift 0.12. Neutral; keep 4 channels.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

@@ -1,0 +1,74 @@
+experiment:
+  id: 20261017T210000-dgsw2l-crps-coarse8-wide
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: crps-coarse8-wide
+  kind: tuning
+  rationale: 'Capacity was last tested under MSE (depth 4, over-fitted). The CRPS objective
+    with stochastic inputs is a different regime: the network must represent a conditional
+    distribution, and the 8-channel run suggested short-range skill can still improve (predictable-range
+    MSE 15.9 vs 17.7). A 1.5x wider U-Net (48/96/192/384 channels, ~4.4M params) on the 8x
+    coarse-noise candidate tests whether more capacity raises short-range skill under CRPS.
+    Local Mac run, seed 42. Note from the 4-seed comparison: the candidate''s extra final-epoch
+    MSE is mostly time-mean bias in the northern recirculation (y~189), where the held-out
+    period departs from the training climate; both models sit equally close to the training
+    climate there.'
+  hypothesis: 'A 48-channel U-Net lowers seed-42 predictable-range MSE below ~16.5 (8x model:
+    17.7) with realism <= ~0.75 and drift <= ~0.2, and benchmark MSE within seed noise.'
+  conclusion: null
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261017T210000-dgsw2l-crps-coarse8-wide.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+  ema_decay: 0.998
+  loss: crps
+model:
+  type: unet
+  hidden_channels: 48
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+  depth: 3
+  stochastic_channels: 4
+  increment_smoothing: 1.0
+  stochastic_scale: 8
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '

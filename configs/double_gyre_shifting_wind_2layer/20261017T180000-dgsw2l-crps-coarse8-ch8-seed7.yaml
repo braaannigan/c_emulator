@@ -8,7 +8,7 @@ experiment:
     predictable-range MSE among incumbent-like models (15.9 vs 17.7 for the 8x incumbent''s
     seed 42) at slightly worse realism (0.78 vs 0.75).'
   hypothesis: See 20261017T180000-dgsw2l-crps-coarse8-ch8.
-  conclusion: null
+  conclusion: 'Seed replica; see 20261017T180000-dgsw2l-crps-coarse8-ch8 (2-seed result: neutral).'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
