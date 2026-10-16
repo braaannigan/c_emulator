@@ -446,3 +446,63 @@ persistence). Track both MSE and variance/KE diagnostics.
 - Hypothesis: See 20261016T140000-dgsw2l-unet-ema-crps-nonoise.
 - Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 294.8 / 449.6 / 0.007265 (std 0.89, KE 1.35); 10: 243.1 / 345.1 / 0.003365 (std 0.85, KE 0.60); 15: 202.7 / 289.1 / 0.002778 (std 0.88, KE 0.46); 20: 223.3 / 382.6 / 0.002555 (std 1.02, KE 0.52); 25: 227.6 / 363.6 / 0.002469 (std 1.03, KE 0.75); 30: 163.4 / 364.1 / 0.001902 (std 0.99, KE 0.85); 35: 149.1 / 347.3 / 0.001841 (std 0.99, KE 0.91); 40: 148.6 / 387 / 0.001861 (std 0.98, KE 0.93); 45: 160.1 / 391 / 0.00202 (std 0.99, KE 0.94); 50: 161.8 / 435.8 / 0.002311 (std 0.97, KE 0.94); 55: 163.8 / 476.8 / 0.002176 (std 0.97, KE 0.96); 60: 167.9 / 466.6 / 0.002398 (std 0.98, KE 0.95)
 - Conclusion: Seed replica; see 20261016T140000-dgsw2l-unet-ema-crps-nonoise.
+
+### 20261016T160000-dgsw2l-crps-tuning-ch8 — tuning
+- Hypothesis: Compared with the CRPS incumbent's six seeds (epochs 30-60 145.4 +/- 1.3, final 151.1 +/- 3.6, KE last 0.86), the change lowers the 3-seed epochs 30-60 mean below ~140 or raises the KE ratio at the last step above 0.9 without worsening eval_mse_mean.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 254.2 / 373.6 / 0.004628 (std 0.98, KE 0.83); 10: 219.2 / 336.2 / 0.00298 (std 0.98, KE 0.50); 15: 183.9 / 318.6 / 0.002694 (std 0.99, KE 0.45); 20: 206.1 / 364.3 / 0.002516 (std 1.03, KE 0.57); 25: 199.6 / 299.1 / 0.00239 (std 1.04, KE 0.76); 30: 142.4 / 273.4 / 0.001628 (std 1.01, KE 0.84); 35: 135 / 278.3 / 0.001565 (std 0.98, KE 0.89); 40: 145.9 / 376.7 / 0.001843 (std 0.97, KE 0.91); 45: 160.2 / 364.3 / 0.002046 (std 0.97, KE 0.93); 50: 145.8 / 304.8 / 0.001945 (std 0.98, KE 0.94); 55: 150.8 / 341.3 / 0.002091 (std 0.98, KE 0.94); 60: 136.3 / 337.6 / 0.002025 (std 0.97, KE 0.94)
+- Conclusion: Neutral, not adopted (6-vs-6 seeds). 8 stochastic channels instead of 4: epochs 30-60 148.3 +/- 2.6 vs 145.4 +/- 1.3; final 144.1 +/- 6.6 vs 151.1 +/- 3.6; velocity MSE 0.00195 vs 0.00195; KE ratio at the last step 0.87 vs 0.86; step-20 MSE 16.1 vs 15.0. The promising 3-seed result (144.5 / 142.4) did not hold with seeds 11/19/23. Keep 4 channels.
+
+### 20261016T160000-dgsw2l-crps-tuning-noise05 — tuning
+- Hypothesis: Compared with the CRPS incumbent's six seeds (epochs 30-60 145.4 +/- 1.3, final 151.1 +/- 3.6, KE last 0.86), the change lowers the 3-seed epochs 30-60 mean below ~140 or raises the KE ratio at the last step above 0.9 without worsening eval_mse_mean.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 273 / 457.7 / 0.007632 (std 1.01, KE 1.40); 10: 227.1 / 449.4 / 0.003504 (std 1.05, KE 0.62); 15: 205 / 403.2 / 0.002872 (std 1.03, KE 0.53); 20: 214.3 / 402.9 / 0.002444 (std 1.05, KE 0.59); 25: 215.2 / 385.3 / 0.002299 (std 1.03, KE 0.72); 30: 186.6 / 432.9 / 0.002174 (std 1.01, KE 0.80); 35: 161.6 / 368.3 / 0.002126 (std 0.98, KE 0.86); 40: 165.4 / 378.9 / 0.002098 (std 0.97, KE 0.91); 45: 163.3 / 419.6 / 0.002297 (std 0.98, KE 0.93); 50: 165 / 362.8 / 0.002369 (std 0.97, KE 0.93); 55: 178 / 425 / 0.002291 (std 0.98, KE 0.96); 60: 169.9 / 424.4 / 0.002318 (std 0.98, KE 0.95)
+- Conclusion: Rejected. Start-state noise 0.5 with CRPS: 3-seed epochs 30-60 mean 159.6 (170.0 / 153.4 / 155.5), final 162.3, velocity MSE 0.0022, KE last 0.83 vs the CRPS incumbent's 145.4 / 151.1 / 0.00195 / 0.86. Start-state noise of 1.0 is still needed even with stochastic inputs.
+
+### 20261016T173000-dgsw2l-crps-unroll12 — medium_step
+- Hypothesis: Training the CRPS incumbent on 12-step unrolls lowers the 3-seed epochs 30-60 mean below ~140 (incumbent 145.4 +/- 1.3) and step-20 error below 15, keeping KE ratio at the last step at or above 0.86.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 273 / 467 / 0.007303 (std 1.02, KE 1.41); 10: 222.7 / 435.5 / 0.003196 (std 1.05, KE 0.69); 15: 184.3 / 336.9 / 0.002547 (std 0.98, KE 0.53); 20: 184.1 / 303.1 / 0.002268 (std 1.00, KE 0.56); 25: 188.6 / 332.1 / 0.002195 (std 1.03, KE 0.71); 30: 170.4 / 288.9 / 0.001834 (std 1.02, KE 0.81); 35: 165.7 / 386.9 / 0.002347 (std 1.01, KE 0.86); 40: 151.8 / 355.2 / 0.001826 (std 1.00, KE 0.90); 45: 145.4 / 272 / 0.002099 (std 0.98, KE 0.92); 50: 162.9 / 455.2 / 0.002455 (std 0.97, KE 0.94); 55: 135.5 / 408.2 / 0.001995 (std 0.98, KE 0.95); 60: 148.7 / 434.2 / 0.00229 (std 0.97, KE 0.94)
+- Conclusion: Rejected. 12-step unrolls with CRPS: 3-seed epochs 30-60 154.4 / 157.8 / 151.5 (mean 154.6) and finals 148.7 / 171.5 / 166.2 (mean 162.1) vs the CRPS incumbent's 145.4 / 151.1, with lower KE at the last step (0.80-0.86) and 1.5x run time (10-20 min). Even without the blurring incentive of MSE, longer unrolls trade update count and short-lead fit for nothing at mid leads. Keep 8 steps.
+
+### 20261016T160000-dgsw2l-crps-tuning-ch8-seed7 — tuning
+- Hypothesis: See 20261016T160000-dgsw2l-crps-tuning-ch8.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 249.3 / 320.1 / 0.004631 (std 0.92, KE 0.93); 10: 213 / 280.2 / 0.003048 (std 0.86, KE 0.57); 15: 206 / 304.9 / 0.002914 (std 0.86, KE 0.46); 20: 191.8 / 339.5 / 0.002502 (std 0.94, KE 0.60); 25: 197.6 / 286.7 / 0.00234 (std 0.98, KE 0.79); 30: 134 / 306.2 / 0.001603 (std 0.98, KE 0.86); 35: 126.7 / 243.1 / 0.001477 (std 0.97, KE 0.90); 40: 131 / 226.2 / 0.001597 (std 0.97, KE 0.91); 45: 160.3 / 405 / 0.002021 (std 0.97, KE 0.93); 50: 153.3 / 333 / 0.001851 (std 0.97, KE 0.93); 55: 159.3 / 431.2 / 0.002116 (std 0.97, KE 0.94); 60: 159.1 / 427.1 / 0.002136 (std 0.97, KE 0.95)
+- Conclusion: Seed replica; see 20261016T160000-dgsw2l-crps-tuning-ch8.
+
+### 20261016T160000-dgsw2l-crps-tuning-ch8-seed123 — tuning
+- Hypothesis: See 20261016T160000-dgsw2l-crps-tuning-ch8.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 251 / 371.2 / 0.007361 (std 0.95, KE 1.37); 10: 200.4 / 321.4 / 0.003186 (std 0.97, KE 0.49); 15: 206.5 / 400.3 / 0.002838 (std 0.98, KE 0.38); 20: 216.7 / 431.2 / 0.002597 (std 1.00, KE 0.48); 25: 207.3 / 387.5 / 0.002226 (std 1.02, KE 0.68); 30: 164.7 / 303.8 / 0.001806 (std 1.01, KE 0.81); 35: 114.7 / 170.5 / 0.001426 (std 1.01, KE 0.88); 40: 162.6 / 463.1 / 0.002082 (std 1.01, KE 0.92); 45: 137.8 / 461.6 / 0.001925 (std 0.99, KE 0.93); 50: 130 / 394.9 / 0.001857 (std 0.99, KE 0.95); 55: 152.1 / 373.4 / 0.002129 (std 0.99, KE 0.95); 60: 131.9 / 249.9 / 0.001862 (std 0.99, KE 0.94)
+- Conclusion: Seed replica; see 20261016T160000-dgsw2l-crps-tuning-ch8.
+
+### 20261016T160000-dgsw2l-crps-tuning-ch8-seed11 — tuning
+- Hypothesis: See 20261016T160000-dgsw2l-crps-tuning-ch8.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 250.2 / 394 / 0.004695 (std 0.98, KE 0.82); 10: 194.6 / 274.2 / 0.003022 (std 0.92, KE 0.51); 15: 185.1 / 263.2 / 0.002733 (std 0.94, KE 0.49); 20: 200 / 290.1 / 0.00267 (std 0.98, KE 0.70); 25: 188 / 271.8 / 0.002414 (std 0.98, KE 0.80); 30: 142.5 / 272.9 / 0.001636 (std 0.97, KE 0.87); 35: 141.7 / 335.2 / 0.00195 (std 0.97, KE 0.90); 40: 158.4 / 384.8 / 0.002228 (std 0.97, KE 0.92); 45: 174.8 / 447.2 / 0.002326 (std 0.97, KE 0.94); 50: 163.2 / 439.4 / 0.002394 (std 0.97, KE 0.94); 55: 158.3 / 413.6 / 0.002353 (std 0.97, KE 0.95); 60: 156.3 / 412.4 / 0.002367 (std 0.97, KE 0.95)
+- Conclusion: Seed replica; see 20261016T160000-dgsw2l-crps-tuning-ch8.
+
+### 20261016T160000-dgsw2l-crps-tuning-ch8-seed19 — tuning
+- Hypothesis: See 20261016T160000-dgsw2l-crps-tuning-ch8.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 269.7 / 456.1 / 0.003942 (std 0.99, KE 0.74); 10: 214.7 / 349.6 / 0.002934 (std 0.96, KE 0.45); 15: 182.8 / 309.6 / 0.002619 (std 0.96, KE 0.41); 20: 203.8 / 323.1 / 0.002361 (std 1.02, KE 0.63); 25: 211 / 302.3 / 0.002306 (std 1.02, KE 0.75); 30: 148.3 / 278.1 / 0.001669 (std 1.00, KE 0.83); 35: 143.6 / 371.5 / 0.001806 (std 0.99, KE 0.88); 40: 142.8 / 322.7 / 0.001786 (std 0.98, KE 0.90); 45: 146.1 / 446.7 / 0.002005 (std 0.98, KE 0.93); 50: 159.8 / 444.1 / 0.002222 (std 0.98, KE 0.93); 55: 143.3 / 431.5 / 0.002184 (std 0.97, KE 0.93); 60: 121.7 / 327.6 / 0.001711 (std 0.98, KE 0.93)
+- Conclusion: Seed replica; see 20261016T160000-dgsw2l-crps-tuning-ch8.
+
+### 20261016T160000-dgsw2l-crps-tuning-ch8-seed23 — tuning
+- Hypothesis: See 20261016T160000-dgsw2l-crps-tuning-ch8.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 280.2 / 440.2 / 0.008946 (std 0.96, KE 1.72); 10: 218.2 / 402.5 / 0.003294 (std 0.97, KE 0.60); 15: 217.7 / 416.3 / 0.002775 (std 1.00, KE 0.47); 20: 257.6 / 493.4 / 0.002563 (std 1.08, KE 0.55); 25: 235.1 / 402.9 / 0.002302 (std 1.08, KE 0.76); 30: 184.7 / 353 / 0.002042 (std 1.05, KE 0.83); 35: 130.8 / 255.6 / 0.001509 (std 1.02, KE 0.88); 40: 146.2 / 339.6 / 0.001947 (std 1.00, KE 0.91); 45: 151.4 / 375.4 / 0.00202 (std 0.98, KE 0.92); 50: 160.3 / 468.4 / 0.002425 (std 0.98, KE 0.93); 55: 159.4 / 369.9 / 0.002164 (std 0.97, KE 0.94); 60: 159.3 / 420 / 0.002258 (std 0.97, KE 0.94)
+- Conclusion: Seed replica; see 20261016T160000-dgsw2l-crps-tuning-ch8.
+
+### 20261016T160000-dgsw2l-crps-tuning-noise05-seed7 — tuning
+- Hypothesis: See 20261016T160000-dgsw2l-crps-tuning-noise05.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 274.4 / 418.5 / 0.01442 (std 0.89, KE 2.63); 10: 240.6 / 379.5 / 0.004637 (std 0.86, KE 0.76); 15: 217.2 / 370.7 / 0.003002 (std 0.90, KE 0.47); 20: 224.9 / 375.9 / 0.00256 (std 1.00, KE 0.62); 25: 189.7 / 285.3 / 0.002156 (std 1.01, KE 0.77); 30: 138.1 / 337.1 / 0.001546 (std 1.00, KE 0.85); 35: 160.2 / 372.8 / 0.001974 (std 0.99, KE 0.90); 40: 171.4 / 479.1 / 0.002251 (std 0.98, KE 0.92); 45: 162.1 / 446.8 / 0.002301 (std 0.99, KE 0.94); 50: 144.8 / 374.2 / 0.002249 (std 0.98, KE 0.94); 55: 137.3 / 282.6 / 0.002175 (std 0.99, KE 0.95); 60: 159.7 / 235.1 / 0.002553 (std 0.98, KE 0.94)
+- Conclusion: Seed replica; see 20261016T160000-dgsw2l-crps-tuning-noise05.
+
+### 20261016T173000-dgsw2l-crps-unroll12-seed7 — tuning
+- Hypothesis: See 20261016T173000-dgsw2l-crps-unroll12.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 262.1 / 389.2 / 0.01505 (std 0.90, KE 2.81); 10: 229.9 / 352.7 / 0.004381 (std 0.84, KE 0.85); 15: 203.6 / 318.4 / 0.002774 (std 0.88, KE 0.53); 20: 196.9 / 327.1 / 0.002451 (std 0.95, KE 0.55); 25: 212.3 / 276.6 / 0.002462 (std 1.00, KE 0.80); 30: 159.8 / 280.8 / 0.001999 (std 0.99, KE 0.84); 35: 144.1 / 254.4 / 0.00177 (std 0.98, KE 0.87); 40: 150.8 / 408.1 / 0.002037 (std 0.97, KE 0.91); 45: 154.8 / 449.5 / 0.002212 (std 0.97, KE 0.92); 50: 160.1 / 465.6 / 0.002352 (std 0.97, KE 0.93); 55: 163.5 / 477 / 0.002553 (std 0.97, KE 0.93); 60: 171.5 / 467.6 / 0.002679 (std 0.98, KE 0.94)
+- Conclusion: Seed replica; see 20261016T173000-dgsw2l-crps-unroll12.
+
+### 20261016T160000-dgsw2l-crps-tuning-noise05-seed123 — tuning
+- Hypothesis: See 20261016T160000-dgsw2l-crps-tuning-noise05.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 283.3 / 426.9 / 0.00788 (std 0.90, KE 1.48); 10: 228.6 / 320.5 / 0.003156 (std 0.86, KE 0.60); 15: 196.5 / 297.2 / 0.002627 (std 0.89, KE 0.49); 20: 204.3 / 283.7 / 0.002492 (std 0.91, KE 0.57); 25: 208.8 / 315.6 / 0.002378 (std 0.96, KE 0.76); 30: 168.3 / 335.5 / 0.002013 (std 0.97, KE 0.84); 35: 147.7 / 327.4 / 0.00187 (std 0.99, KE 0.90); 40: 131.7 / 319.4 / 0.001797 (std 0.98, KE 0.92); 45: 145.6 / 273.9 / 0.002267 (std 0.99, KE 0.94); 50: 170 / 417.4 / 0.002712 (std 0.98, KE 0.94); 55: 168 / 441.3 / 0.00273 (std 0.98, KE 0.94); 60: 157.2 / 427.1 / 0.002359 (std 0.99, KE 0.95)
+- Conclusion: Seed replica; see 20261016T160000-dgsw2l-crps-tuning-noise05.
+
+### 20261016T173000-dgsw2l-crps-unroll12-seed123 — tuning
+- Hypothesis: See 20261016T173000-dgsw2l-crps-unroll12.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 268.4 / 400.6 / 0.007693 (std 0.89, KE 1.44); 10: 204.7 / 296.3 / 0.002804 (std 0.84, KE 0.61); 15: 175.4 / 271.2 / 0.002348 (std 0.89, KE 0.53); 20: 174.3 / 290.9 / 0.002262 (std 0.98, KE 0.58); 25: 196.4 / 307.3 / 0.002288 (std 1.01, KE 0.77); 30: 128 / 300.3 / 0.001472 (std 0.99, KE 0.83); 35: 133.7 / 250.1 / 0.001677 (std 0.98, KE 0.88); 40: 149.7 / 416.5 / 0.002058 (std 0.98, KE 0.91); 45: 154.5 / 440.6 / 0.00213 (std 0.98, KE 0.93); 50: 165.8 / 447.1 / 0.002472 (std 0.98, KE 0.93); 55: 162.5 / 453.8 / 0.002374 (std 0.98, KE 0.94); 60: 166.2 / 450.2 / 0.002477 (std 0.98, KE 0.94)
+- Conclusion: Seed replica; see 20261016T173000-dgsw2l-crps-unroll12.
