@@ -69,7 +69,7 @@ class LatentModel(nn.Module):
     def _static_at(self, size: tuple[int, int], batch: int) -> torch.Tensor | None:
         if not self.static.numel():
             return None
-        return F.adaptive_avg_pool2d(self.static, size).expand(batch, -1, -1, -1)
+        return F.interpolate(self.static, size=size, mode="bilinear", align_corners=False).expand(batch, -1, -1, -1)
 
     def encode(self, state: torch.Tensor) -> torch.Tensor:
         x = (state - self.state_mean) / self.state_std
@@ -82,7 +82,8 @@ class LatentModel(nn.Module):
         return self.to_latent(F.avg_pool2d(x, 2))
 
     def step(self, latent: torch.Tensor, forcing: torch.Tensor) -> torch.Tensor:
-        wind = F.adaptive_avg_pool2d(((forcing - self.forcing_mean) / self.forcing_std)[:, None], latent.shape[-2:])
+        # Wind and static fields are smooth, so bilinear resizing to the latent grid suffices.
+        wind = F.interpolate(((forcing - self.forcing_mean) / self.forcing_std)[:, None], size=latent.shape[-2:], mode="bilinear", align_corners=False)
         parts = [latent, wind]
         static = self._static_at(latent.shape[-2:], latent.shape[0])
         if static is not None:
