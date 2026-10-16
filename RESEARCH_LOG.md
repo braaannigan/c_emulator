@@ -29,6 +29,17 @@
   (`scripts/runpod_run.py`, add `--diagnostics` for remote fidelity
   reports) plus one local run on the Mac GPU.
 
+- Scorecard baselines (seed-42 final checkpoints; held-out `predictable_mse`
+  over 26 steps, `realism`, grid-noise excess in decades, 25-year
+  `drift_score`; lower is better): deterministic EMA 20.9 / 0.91 / 1.8 /
+  0.004; CRPS 13.7 / 1.14 / 2.7 / 0.67; smoothed CRPS (incumbent) 14.4 / 0.99
+  / 1.5 / 0.29; sigma-0.6 smoothing - / 1.14 / 2.1 / 0.54. Three-seed
+  epochs 30-60 `predictable_mse` from logs: EMA 21.5, CRPS 17.4, smoothed
+  CRPS 18.8. The stochastic models buy short-range skill at some realism
+  cost (grid noise, and eddy-band power lost to smoothing: eddy-band ratio
+  0.83); the deterministic EMA model has the best spectra and no drift but
+  the weakest short-range skill.
+
 Previous incumbent (CRPS without smoothing):
 `20261016T140000-dgsw2l-unet-ema-crps` - stochastic CRPS U-Net with EMA;
 six-seed epochs 30-60 145.4, final 151.1, KE at the last step 0.86.
