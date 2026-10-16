@@ -10,7 +10,9 @@ experiment:
   hypothesis: Changing the batch size (with a matched learning rate) around the EMA incumbent
     lowers the 3-seed epochs 30-60 average below 151.5 and the 3-seed final below 147.0 by
     more than ~10, with KE and h-std ratios above 0.9.
-  conclusion: null
+  conclusion: 'Rejected. Batch 16 (LR 5e-4, EMA 0.996): 3-seed finals 182.8 / 166.9 / 162.7
+    (mean 170.8) and epochs 30-60 averages 164.6 / 150.1 / 161.1 (mean 158.6) vs the incumbent''s
+    146.4 / 149.6 (6-seed). Fewer, smoother updates generalise slightly worse.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

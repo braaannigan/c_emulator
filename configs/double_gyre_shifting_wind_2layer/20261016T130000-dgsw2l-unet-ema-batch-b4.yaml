@@ -11,7 +11,15 @@ experiment:
   hypothesis: Changing the batch size (with a matched learning rate) around the EMA incumbent
     lowers the 3-seed epochs 30-60 average below 151.5 and the 3-seed final below 147.0 by
     more than ~10, with KE and h-std ratios above 0.9.
-  conclusion: null
+  conclusion: 'Neutral, not adopted (6-vs-6 seeds). Batch 4 (LR 3e-4, EMA 0.999) over seeds
+    42/7/123/11/19/23: final mean 157.6 (se 4.4), epochs 30-60 mean 149.4 (se 4.6). Unchanged
+    incumbent (batch 8) over the same six seeds: final 146.4 (se 7.3), epochs 30-60 149.6
+    (se 2.8). Identical within noise; the 3-seed hint (144.9) was seed luck. Six-seed incumbent
+    reference for future comparisons: epochs 30-60 149.6 +/- 2.8, final 146.4 +/- 7.3. Error
+    decomposition of the EMA incumbent''s rollout: MSE 158.5 = bias^2 6.6 + var_truth 125.2
+    + var_model 107.0 - 2cov 80.3 (tail beyond step 50: bias^2 9.5, 2cov only 32.5). The model''s
+    climate bias is already below climatology''s (11.6), so the remaining error is the loss
+    of covariance with the truth in the chaotic tail.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

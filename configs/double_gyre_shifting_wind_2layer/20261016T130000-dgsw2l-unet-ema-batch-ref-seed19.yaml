@@ -7,7 +7,7 @@ experiment:
   rationale: Extra seed of the unchanged EMA incumbent (batch 8) for a 6-vs-6 seed comparison
     with 20261016T130000-dgsw2l-unet-ema-batch-b4.
   hypothesis: See 20261016T130000-dgsw2l-unet-ema-batch-b4.
-  conclusion: null
+  conclusion: Extra incumbent seed; see 20261016T130000-dgsw2l-unet-ema-batch-b4.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

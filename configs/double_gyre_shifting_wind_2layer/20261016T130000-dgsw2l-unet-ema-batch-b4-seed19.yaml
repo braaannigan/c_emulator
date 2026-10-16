@@ -8,7 +8,7 @@ experiment:
     mean (144.9) was 6.6 below the incumbent, inside the noise, so the comparison is widened
     to 6 seeds per arm.'
   hypothesis: See 20261016T130000-dgsw2l-unet-ema-batch-b4.
-  conclusion: null
+  conclusion: Extra seed; see 20261016T130000-dgsw2l-unet-ema-batch-b4.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
