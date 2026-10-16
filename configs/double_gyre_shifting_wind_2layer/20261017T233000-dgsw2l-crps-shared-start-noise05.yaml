@@ -12,7 +12,16 @@ experiment:
   hypothesis: Shared start noise of 0.5 brings the steps 1-26 spread/error ratio to 0.7-1.3
     while keeping the long-lead ratio >= 0.7, and recovers member predictable-range MSE below
     ~25 and realism below ~0.85.
-  conclusion: null
+  conclusion: 'Not promoted; best calibrated ensemble so far. Halving the shared start noise
+    (0.5) fixes the early over-dispersion: held-out spread/error 0.77 over steps 1-26 and
+    0.85 beyond (vs 1.49 / 0.95 at 1.0), and the 4-member ensemble mean scores eval_mse_mean
+    123.9 (climatology 136.8). Individual members remain worse and less realistic than the
+    incumbent: epochs 30-60 / final 179 / 165 (incumbent 152.5 / 157.6), predictable-range
+    MSE 29.3 (17.5), realism 0.99 (0.72), grid-noise excess 1.6 decades (0.97); drift 0.16
+    (0.12-0.23). Red flag: in the 25-year run the upper-layer thickness autocorrelation never
+    falls below 1/e within 20 steps (e-folding = inf vs truth 7.7), suggesting a persistent
+    long-run state. This inf in the diagnostics report made RunPod drop the job output twice
+    (fixed: worker output is now strict JSON); results were recovered from the volume.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
