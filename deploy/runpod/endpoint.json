@@ -1,6 +1,8 @@
 {
-  "endpoint_id": "hq8300obly1t18",
+  "endpoint_id": "d3s5uywceiz972",
   "template_id": "bob0m0rp1f",
   "network_volume_id": "9ucos2u9uw",
-  "data_center": "EU-RO-1"
+  "data_center": "EU-RO-1",
+  "gpu_pool": "AMPERE_16 (16 GB tier, e.g. RTX 2000 Ada / A4000)",
+  "previous_endpoint_id": "hq8300obly1t18 (RTX 4090, retire after in-flight jobs finish)"
 }
