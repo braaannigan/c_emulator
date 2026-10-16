@@ -58,8 +58,12 @@ class Pod:
     def ssh(self, command: str, check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
         return subprocess.run(["ssh", *self.opts, "-p", self.port, self.host, command], check=check, capture_output=capture, text=True)
 
-    def scp_to(self, local: Path, remote: str) -> None:
-        subprocess.run(["scp", "-q", *self.opts, "-P", self.port, str(local), f"{self.host}:{remote}"], check=True)
+    def scp_to(self, local: Path, remote: str, attempts: int = 3) -> None:
+        for attempt in range(attempts):
+            if subprocess.run(["scp", "-q", *self.opts, "-P", self.port, str(local), f"{self.host}:{remote}"]).returncode == 0:
+                return
+            time.sleep(5 * (attempt + 1))
+        raise RuntimeError(f"scp of {local.name} failed {attempts} times")
 
 
 DEFAULT_GPUS = [
@@ -95,14 +99,15 @@ def create_pod(choices: list[str]) -> Pod:
     raise RuntimeError("no GPU available from the preference list")
 
 
-def upload_data(pod: Pod, pieces: int = 16) -> None:
+def upload_data(pod: Pod, pieces: int = 16, parallel: int = 8) -> None:
     """Parallel chunked upload: a single SSH stream is far slower than the link."""
 
     TRAIN_FILE = FAMILY / "train" / TRAIN_NAME
     with tempfile.TemporaryDirectory() as tmp:
         subprocess.run(["split", "-b", f"{TRAIN_FILE.stat().st_size // pieces + 1}", str(TRAIN_FILE), f"{tmp}/part_"], check=True)
         parts = sorted(Path(tmp).iterdir())
-        with ThreadPoolExecutor(max_workers=pieces) as pool:
+        # sshd commonly limits concurrent unauthenticated connections (MaxStartups 10).
+        with ThreadPoolExecutor(max_workers=parallel) as pool:
             list(pool.map(lambda part: pod.scp_to(part, f"/root/chunks/{part.name}"), parts))
     target = f"{REMOTE_VOLUME}/data/double_gyre_shifting_wind_2layer/train/{TRAIN_FILE.name}"
     pod.ssh(f"cat /root/chunks/part_* > {target} && rm -rf /root/chunks && ls -l {target}")
