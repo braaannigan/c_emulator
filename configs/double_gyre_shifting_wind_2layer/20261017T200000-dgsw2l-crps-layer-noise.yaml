@@ -15,7 +15,13 @@ experiment:
     time toward the truth's 9.7 steps and raises its slow-band variance ratio, without worsening
     realism (<= ~0.75), drift (<= ~0.2) or predictable-range MSE (within ~1 of 17.7 for seed
     42).
-  conclusion: null
+  conclusion: 'Rejected (target missed; single seed). Halving the start-state noise in the
+    lower layer (h1, u1, v1) on the 8x coarse-noise model does not lengthen lower-layer memory:
+    long-run lower-layer thickness e-folding 6.6 steps vs 7.2 for the 8x model (truth 9.7)
+    and slow-band variance 0.64 vs 0.74 (worse). Overall scorecard slightly better than the
+    8x model''s seed 42 but within single-seed noise: realism 0.68 vs 0.75, drift 0.08 vs
+    0.12, predictable-range MSE 17.3 vs 17.7, eval_mse_mean 151 / 154 (epochs 30-60 / final)
+    vs 153 / 151.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
