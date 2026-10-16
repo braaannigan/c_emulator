@@ -100,6 +100,29 @@ def scorecard(prediction: np.ndarray, truth: np.ndarray, thickness_mse_by_time: 
     return scores
 
 
+def realism_from_statistics(statistics: dict[str, Any]) -> dict[str, float]:
+    """Rebuild the realism scores from a ``compare_statistics`` report (e.g. older diagnostics reports)."""
+
+    errors, excess, amplitude, pattern = [], [], [], []
+    for entry in statistics["layers"].values():
+        for field in ("thickness", "zonal_velocity"):
+            for axis in ("x", "y"):
+                ratios = entry[f"{field}_spectrum_{axis}_band_ratio"]
+                errors.extend(abs(float(np.log(ratios[band]))) for band in ("large", "eddy") if ratios[band] and ratios[band] > 0)
+                if ratios["small"] and ratios["small"] > 0:
+                    excess.append(max(0.0, float(np.log10(ratios["small"]))))
+        amplitude.append(abs(float(np.log(entry["eke_map"]["ratio"]))))
+        pattern.append(1.0 - entry["eke_map"]["pattern_correlation"])
+    scores = {
+        "spectral_error": float(np.mean(errors)),
+        "noise_excess_decades": float(np.mean(excess)) if excess else 0.0,
+        "eke_amplitude_error": float(np.mean(amplitude)),
+        "eke_pattern_error": float(np.mean(pattern)),
+    }
+    scores["realism"] = scores["spectral_error"] + scores["eke_amplitude_error"] + scores["eke_pattern_error"] + NOISE_WEIGHT * scores["noise_excess_decades"]
+    return scores
+
+
 def drift_score(yearly_ke: list[float], truth_yearly_ke: list[float], window: int = 5) -> dict[str, float]:
     """Long-run drift: share of years outside the truth's yearly KE range and the late/early KE log-ratio."""
 

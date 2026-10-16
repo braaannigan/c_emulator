@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from src.scorecard import PREDICTABLE_STEPS, drift_score, eke_scores, predictable_mse, scorecard, spectral_scores, summarise
+from src.scorecard import PREDICTABLE_STEPS, drift_score, realism_from_statistics, eke_scores, predictable_mse, scorecard, spectral_scores, summarise
 
 
 def fields(seed=0, shape=(40, 6, 44, 40)):
@@ -61,3 +61,20 @@ def test_tiny_grids_are_scored_whole():
     truth = fields(shape=(6, 6, 4, 4))
     scores = scorecard(truth, truth, np.zeros(6))
     assert scores["eke_amplitude_error"] == pytest.approx(0.0)
+
+
+def test_realism_from_statistics_matches_direct_scorecard():
+    from src.diagnostics import compare_statistics
+
+    truth = fields(seed=1)
+    model = 0.8 * truth + 0.3 * fields(seed=2)
+    times = np.arange(len(truth)) * 7.0
+    rebuilt = realism_from_statistics(compare_statistics(model, truth, times, times, 40.0, max_lag=3))
+    direct = scorecard(model, truth, np.zeros(len(truth)))
+    for key in ("spectral_error", "noise_excess_decades", "eke_amplitude_error", "eke_pattern_error", "realism"):
+        assert rebuilt[key] == pytest.approx(direct[key], rel=1e-6)
+    no_small = compare_statistics(truth, truth, times, times, 40.0, max_lag=3)
+    for layer in no_small["layers"].values():
+        for key in [k for k in layer if k.endswith("band_ratio") and "spectrum" in k]:
+            layer[key]["small"] = float("nan")
+    assert realism_from_statistics(no_small)["noise_excess_decades"] == 0.0
