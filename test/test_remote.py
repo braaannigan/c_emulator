@@ -223,3 +223,11 @@ def test_record_outputs_writes_diagnostics_report(tmp_path):
     written = record_outputs(output, tmp_path, results)
     report = tmp_path / "data" / "fam" / "diagnostics" / "exp" / "report.json"
     assert json.loads(report.read_text()) == {"k": 2} and str(report) in written
+
+
+def test_json_safe_replaces_non_finite_numbers():
+    from src.remote.job import json_safe
+
+    value = {"a": float("inf"), "b": [1.0, float("nan"), {"c": -float("inf")}], "d": "x", "e": 2}
+    assert json_safe(value) == {"a": None, "b": [1.0, None, {"c": None}], "d": "x", "e": 2}
+    json.dumps(json_safe(value), allow_nan=False)

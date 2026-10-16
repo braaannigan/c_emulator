@@ -9,6 +9,7 @@ the local machine can record them.
 from __future__ import annotations
 
 import json
+import math
 import shutil
 import subprocess
 from collections.abc import Callable
@@ -109,6 +110,23 @@ def run_diagnostics(repo_dir: Path, config: str, long_years: float, volume_dir: 
     return result
 
 
+def json_safe(value: Any) -> Any:
+    """Replace non-finite floats (NaN, +/-inf) with None, recursively.
+
+    RunPod drops a job's whole output if it is not strict JSON, and
+    diagnostics can legitimately contain inf (e.g. an e-folding time that
+    never crosses 1/e).
+    """
+
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {key: json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [json_safe(item) for item in value]
+    return value
+
+
 def run_job(job_input: dict[str, Any], work_dir: Path, volume_dir: Path, run: Runner = subprocess.run) -> dict[str, Any]:
     ref, config, smoke_test = validate_job(job_input)
     repo_dir = work_dir / "repo"
@@ -130,4 +148,4 @@ def run_job(job_input: dict[str, Any], work_dir: Path, volume_dir: Path, run: Ru
         result.update(collect_outputs(repo_dir, config, volume_dir))
         if job_input.get("diagnostics") and not smoke_test:
             result["diagnostics"] = run_diagnostics(repo_dir, config, float(job_input.get("long_years", 25)), volume_dir, run)
-    return result
+    return json_safe(result)
