@@ -79,13 +79,19 @@ def create_pod(choices: list[str]) -> Pod:
         cloud, gpu = choice.split(":", 1)
         result = subprocess.run(
             ["runpodctl", "pod", "create", "--image", IMAGE, "--gpu-id", gpu, "--cloud-type", cloud, "--name", "dgsw2l-queue",
-             "--container-disk-in-gb", "40", "--wait", "--wait-timeout", "15m"],
+             "--container-disk-in-gb", "40", "--ports", "22/tcp", "--wait", "--wait-timeout", "6m"],
             capture_output=True, text=True,
         )
         if result.returncode == 0:
             log(f"got {cloud} {gpu}")
             return Pod(json.loads(result.stdout))
-        log(f"unavailable: {cloud} {gpu} ({result.stdout.strip()[:120] or result.stderr.strip()[:120]})")
+        message = (result.stdout.strip() or result.stderr.strip())[:200]
+        log(f"unavailable: {cloud} {gpu} ({message})")
+        # A pod that was created but never became reachable over SSH still bills: delete it.
+        for pod in json.loads(subprocess.run(["runpodctl", "pod", "list"], capture_output=True, text=True).stdout or "[]"):
+            if pod.get("name") == "dgsw2l-queue":
+                subprocess.run(["runpodctl", "pod", "delete", pod["id"]], capture_output=True)
+                log(f"deleted unreachable pod {pod['id']}")
     raise RuntimeError("no GPU available from the preference list")
 
 
