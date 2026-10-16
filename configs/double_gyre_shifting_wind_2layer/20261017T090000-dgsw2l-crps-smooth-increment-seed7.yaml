@@ -1,0 +1,67 @@
+experiment:
+  id: 20261017T090000-dgsw2l-crps-smooth-increment-seed7
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: crps-smooth-increment-seed7
+  kind: tuning
+  rationale: 'Second seed for 20261017T090000-dgsw2l-crps-smooth-increment: seed 42 gave a
+    20x lower grid-scale noise floor and less KE drift, a better final score (142.2 vs 147.6)
+    but a worse epochs 30-60 average (163.9 vs 144.0); one seed cannot separate that from
+    chaotic checkpoint noise.'
+  hypothesis: See 20261017T090000-dgsw2l-crps-smooth-increment.
+  conclusion: null
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261017T090000-dgsw2l-crps-smooth-increment-seed7.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 7
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+  ema_decay: 0.998
+  loss: crps
+model:
+  type: unet
+  hidden_channels: 32
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+  depth: 3
+  stochastic_channels: 4
+  increment_smoothing: 1.0
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '
