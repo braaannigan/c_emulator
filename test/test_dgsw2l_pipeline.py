@@ -323,3 +323,31 @@ def test_crps_start_noise_spares_fixed_land_cells():
     states = torch.zeros(1, 2, 6, 2, 2)
     loss = unrolled_crps_loss(stepper, states, torch.zeros(1, 1, 2, 2), noise_std=1.0)
     assert float(loss) > 0.0
+
+
+def test_crps_members_generalise_the_two_member_formula():
+    class Noise(torch.nn.Module):
+        def forward(self, x):
+            return torch.randn_like(x[:, :6])
+
+    from src.models.stepper import StateStepper
+
+    stepper = StateStepper(Noise(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual")
+    states = torch.zeros(1, 2, 6, 3, 3)
+    winds = torch.zeros(1, 1, 3, 3)
+    with pytest.raises(ValueError):
+        unrolled_crps_loss(stepper, states, winds, members=1)
+    # N(0,1) members scored against y = 0: E|X| - E|X - X'| / 2 = sqrt(2/pi) - 1/sqrt(pi) ~ 0.234, for any M.
+    torch.manual_seed(0)
+    big = torch.zeros(1, 2, 6, 60, 60)
+    for members in (2, 4):
+        value = float(unrolled_crps_loss(stepper, big, torch.zeros(1, 1, 60, 60), members=members))
+        assert value == pytest.approx(np.sqrt(2 / np.pi) - 1 / np.sqrt(np.pi), abs=0.01)
+
+
+def test_run_experiment_logs_crps_members(tmp_path):
+    config = write_config(tmp_path)
+    config.raw["model"].update({"target_mode": "residual", "stochastic_channels": 1})
+    config.raw["training"].update({"loss": "crps", "crps_members": 3})
+    run_experiment(config, smoke_test=True)
+    assert json.loads(config.experiment_log.read_text())["metadata"]["crps_members"] == 3

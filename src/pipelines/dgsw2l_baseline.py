@@ -163,33 +163,35 @@ def unrolled_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tens
     return loss / steps
 
 
-def unrolled_crps_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tensor, noise_std: float = 0.0) -> torch.Tensor:
-    """Fair CRPS of a two-member ensemble, averaged over unrolled steps.
+def unrolled_crps_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tensor, noise_std: float = 0.0, members: int = 2) -> torch.Tensor:
+    """Fair CRPS of a ``members``-member ensemble, averaged over unrolled steps.
 
-    Each window is rolled out twice with independent stochastic inputs (and
-    independent start-state noise). For two members the fair CRPS per value
-    is ``(|x1 - y| + |x2 - y|) / 2 - |x1 - x2| / 2`` (in output-std units),
-    which is minimised by members drawn from the true conditional
+    Each window is rolled out ``members`` times with independent stochastic
+    inputs (and independent start-state noise). The fair CRPS per value is
+    ``mean_i |x_i - y| - sum_{i != j} |x_i - x_j| / (2 M (M - 1))`` (in
+    output-std units), minimised by members drawn from the true conditional
     distribution, so members stay sharp instead of regressing to the mean.
     """
 
+    if members < 2:
+        raise ValueError("CRPS needs at least two members")
     batch = states.shape[0]
-    pair_states = states.repeat(2, 1, 1, 1, 1)
-    current = pair_states[:, 0]
+    current = states[:, 0].repeat(members, 1, 1, 1)
     if noise_std > 0:
         noise = torch.randn_like(current) * stepper.output_std * noise_std
         if stepper.fixed_mask.numel():
             noise = noise.masked_fill(stepper.fixed_mask, 0.0)
         current = current + noise
-    pair_winds = winds.repeat(2, 1, 1, 1)
+    member_winds = winds.repeat(members, 1, 1, 1)
     steps = winds.shape[1]
     loss = states.new_zeros(())
     for k in range(steps):
-        current = stepper(current, pair_winds[:, k])
-        first, second = current[:batch] / stepper.output_std, current[batch:] / stepper.output_std
+        current = stepper(current, member_winds[:, k])
+        ensemble = (current / stepper.output_std).view(members, batch, *current.shape[1:])
         target = states[:, k + 1] / stepper.output_std
-        crps = 0.5 * ((first - target).abs() + (second - target).abs()) - 0.5 * (first - second).abs()
-        loss = loss + crps.mean()
+        skill = (ensemble - target).abs().mean(dim=0)
+        spread = (ensemble[:, None] - ensemble[None]).abs().sum(dim=(0, 1)) / (2 * members * (members - 1))
+        loss = loss + (skill - spread).mean()
     return loss / steps
 
 
@@ -202,6 +204,7 @@ def train_one_epoch(
     noise_std: float = 0.0,
     ema: AveragedModel | None = None,
     loss_name: str = "mse",
+    crps_members: int = 2,
 ) -> float:
     stepper.train()
     losses: list[float] = []
@@ -209,7 +212,10 @@ def train_one_epoch(
         states = states.to(device)
         winds = winds.to(device)
         optimiser.zero_grad(set_to_none=True)
-        loss = (unrolled_crps_loss if loss_name == "crps" else unrolled_loss)(stepper, states, winds, noise_std)
+        if loss_name == "crps":
+            loss = unrolled_crps_loss(stepper, states, winds, noise_std, crps_members)
+        else:
+            loss = unrolled_loss(stepper, states, winds, noise_std)
         loss.backward()
         if gradient_clip_norm is not None:
             torch.nn.utils.clip_grad_norm_(stepper.parameters(), gradient_clip_norm)
@@ -296,6 +302,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     loss_name = str(config.raw.get("training", {}).get("loss", "mse"))
     if loss_name not in {"mse", "crps"}:
         raise ValueError(f"unknown training loss {loss_name!r}")
+    crps_members = int(config.raw.get("training", {}).get("crps_members", 2))
     dataset = RolloutWindowDataset(state, forcing, train_indices, unroll_steps)
     loader = DataLoader(dataset, batch_size=config.batch_size, shuffle=True)
     model_cfg = config.raw.get("model", {})
@@ -326,6 +333,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
             "ema_decay": config.raw.get("training", {}).get("ema_decay"),
             "input_noise_std": noise_std,
             "training_loss": loss_name,
+            "crps_members": crps_members,
             "stochastic_channels": stepper.stochastic_channels,
             "static_fields": static_fields,
             "fixed_land_cells": bool(stepper.fixed_mask.numel()),
@@ -346,7 +354,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     emulator = StepperEmulator(eval_stepper, device)
     for epoch in range(1, epochs + 1):
         started = time.perf_counter()
-        loss = train_one_epoch(stepper, loader, optimiser, device, gradient_clip_norm=config.gradient_clip_norm, noise_std=noise_std, ema=ema, loss_name=loss_name)
+        loss = train_one_epoch(stepper, loader, optimiser, device, gradient_clip_norm=config.gradient_clip_norm, noise_std=noise_std, ema=ema, loss_name=loss_name, crps_members=crps_members)
         elapsed = time.perf_counter() - started
         log["epochs"].append(
             {
