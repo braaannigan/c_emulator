@@ -13,7 +13,11 @@ experiment:
   hypothesis: 'A 4-member fair CRPS improves the seed-42 epochs 30-60 eval_mse_mean below
     ~138 (incumbent seed 42: 144.0; six-seed mean 145.4, seed sd ~3) and raises the KE ratio
     at the last step above 0.88, without worsening velocity MSE.'
-  conclusion: null
+  conclusion: Neutral, not adopted (single seed per budget rule). A 4-member fair CRPS (seed
+    42) gives epochs 30-60 146.1, final 153.5, velocity MSE 0.00179, KE at the last step 0.90
+    vs the CRPS incumbent's seed-42 run 144.0 / 147.6 / 0.00184 / 0.88 (six-seed mean 145.4,
+    seed sd ~3). Inside one seed-sd on every metric, at 2x the run time (20 min). Two members
+    already give an adequate CRPS gradient; no further seeds spent.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
