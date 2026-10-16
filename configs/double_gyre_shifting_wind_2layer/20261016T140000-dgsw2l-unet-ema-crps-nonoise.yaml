@@ -10,7 +10,8 @@ experiment:
     EMA keeps every scheduled rollout bounded, keeps KE and h-std ratios within 0.9-1.1 at
     the final rollout step (vs ~0.75-0.85 KE for the incumbent), and stays within ~10% of
     the incumbent's 6-seed scores (epochs 30-60 149.6, final 146.4).
-  conclusion: null
+  conclusion: Arm without start-state noise; worse (3-seed epochs 30-60 mean 157.9, final
+    166.3). See 20261016T140000-dgsw2l-unet-ema-crps.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

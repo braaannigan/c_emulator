@@ -7,7 +7,7 @@ experiment:
   rationale: Extra seed of 20261016T140000-dgsw2l-unet-ema-crps for a 6-vs-6 comparison with
     the incumbent's six seeds.
   hypothesis: See 20261016T140000-dgsw2l-unet-ema-crps.
-  conclusion: null
+  conclusion: Seed replica; see 20261016T140000-dgsw2l-unet-ema-crps.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

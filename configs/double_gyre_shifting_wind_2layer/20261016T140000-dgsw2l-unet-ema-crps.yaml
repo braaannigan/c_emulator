@@ -19,7 +19,19 @@ experiment:
     EMA keeps every scheduled rollout bounded, keeps KE and h-std ratios within 0.9-1.1 at
     the final rollout step (vs ~0.75-0.85 KE for the incumbent), and stays within ~10% of
     the incumbent's 6-seed scores (epochs 30-60 149.6, final 146.4).
-  conclusion: null
+  conclusion: 'Supported; promoted to incumbent on fidelity and mid-lead skill at equal primary
+    score (6-vs-6 seeds, user priority: physical realism). A stochastic U-Net (4 fresh noise
+    channels per step) trained with two-member fair CRPS over 8-step unrolls, with start-state
+    noise and EMA 0.998, over seeds 42/7/123/11/19/23 vs the EMA incumbent''s six seeds: epochs
+    30-60 eval_mse_mean 145.4 +/- 1.3 vs 149.6 +/- 2.8 (level within noise, half the seed
+    spread); final 151.1 +/- 3.6 vs 146.4 +/- 7.3 (level); velocity MSE 0.00195 vs 0.00206
+    (better); step-20 thickness MSE at epoch 60 15.0 vs 21.3 (clearly better); KE ratio at
+    the last rollout step 0.86 vs 0.80 (clearly more energetic, realistic eddies late in the
+    run); h-std ratio 0.99-1.00. Each rollout is one sharp ensemble member, not a conditional
+    mean. Without start-state noise (crps-nonoise arm) it is worse (3-seed epochs 30-60 157.9,
+    final 166.3), so noise injection is still needed. Seed-42 rollout regenerated locally
+    (fresh noise draw): 147.3 / 435.6 / 0.00212; decomposition MSE 147.3 = bias^2 14.7 + var_truth
+    125.2 + var_model 106.3 - 2cov 98.8.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

@@ -2,33 +2,36 @@
 
 ## Current incumbent
 
-`20261016T061500-dgsw2l-unet-ema` (seeds 42/7/123 run in parallel on RunPod:
-`-seed7`, `-seed123`).
+`20261016T140000-dgsw2l-unet-ema-crps` (six seeds on RunPod: 42, 7, 123, 11,
+19, 23 as `-seed<N>`).
 
-- Recipe: the U-Net recipe below, evaluated with an exponential moving
-  average of the weights (decay 0.998 per optimiser step). 3-level U-Net
-  (32/64/128/256 ch, 2x avg-pool), residual target, exact per-layer volume
-  conservation over wet cells, land ring pinned, static inputs (train-mean
-  state, coordinates, land mask), 8-step unrolled MSE, white input noise of 1
-  increment-std on each window start, Adam 3e-4, clip 1.0, 60 epochs.
-- Scored against the CUDA control of the previous incumbent
-  (`20261016T050000-dgsw2l-unet-cuda-control`, 3 seeds): epochs 30-60
-  average 151.5 vs 167.1 (every seed better by 12-18); final checkpoints
-  147.0 vs 148.9 (3-seed means, level within noise).
-- Seed-42 final rollout (regenerated locally): eval_mse_mean 158.5 / last
-  287.1 / vel 0.00254; lead-time MSE step-1 0.8, step-5 3.9, step-10 13.7,
-  step-20 17.3. h-std ratio 0.99, KE ratio 0.93.
-- Still not below climatology (136.8): the tail beyond ~50 steps saturates
-  near 2x climate variance. Error decomposition of the U-Net rollout:
-  MSE 155.8 = bias^2 16.1 + var_truth 125.2 + var_model 104.5 - 2cov 90.0.
-- Full rollout: `data/double_gyre_shifting_wind_2layer/rollout/20261016T061500-dgsw2l-unet-ema-final-epoch0060.nc`;
-  checkpoint `data/double_gyre_shifting_wind_2layer/checkpoints/20261016T061500-dgsw2l-unet-ema.pt`
-  (all remote outputs are also on the RunPod volume under `outputs/<id>/`).
-- Experiments now run on the RunPod endpoint (`scripts/runpod_run.py`),
-  three seeds in parallel; compare 3-seed means of the final checkpoint and of
+- Recipe: stochastic 3-level U-Net (32/64/128/256 ch) with 4 fresh standard
+  normal input channels per step, trained with a two-member fair CRPS over
+  8-step unrolls; residual target, exact per-layer volume conservation over
+  wet cells, land ring pinned, static inputs (train-mean state, coordinates,
+  land mask), start-state noise of 1 increment-std, EMA weights (0.998),
+  Adam 3e-4, batch 8, clip 1.0, 60 epochs. Each rollout is one sharp
+  ensemble member.
+- Six-seed scores vs the previous (deterministic EMA) incumbent's six seeds:
+  epochs 30-60 eval_mse_mean 145.4 +/- 1.3 vs 149.6 +/- 2.8; final 151.1 +/-
+  3.6 vs 146.4 +/- 7.3 (primary score level within noise); velocity MSE
+  0.00195 vs 0.00206; step-20 thickness MSE 15.0 vs 21.3; KE ratio at the last
+  rollout step 0.86 vs 0.80; h-std ratio 0.99-1.00. Promoted on physical
+  realism and mid-lead skill at equal primary score (user priority).
+- Seed-42 final rollout (regenerated locally): 147.3 / last 435.6 / vel
+  0.00212; MSE = bias^2 14.7 + var_truth 125.2 + var_model 106.3 - 2cov 98.8.
+- Not below climatology (136.8): beyond ~50 steps any realistic free run
+  saturates near 2x climate variance; lowering the score further would need
+  smoothing (ensemble mean), which the user ruled out in favour of realism.
+- Full rollout: `data/double_gyre_shifting_wind_2layer/rollout/20261016T140000-dgsw2l-unet-ema-crps-final-epoch0060.nc`;
+  checkpoint `data/double_gyre_shifting_wind_2layer/checkpoints/20261016T140000-dgsw2l-unet-ema-crps.pt`
+  (all remote outputs also on the RunPod volume under `outputs/<id>/`).
+- Experiments run on the RunPod endpoint (`scripts/runpod_run.py`), three or
+  six seeds in parallel; compare seed means of the final checkpoint and of
   epochs 30-60.
 
-Previous incumbents: `20261015T204500-dgsw2l-unet-multiscale` (U-Net, MPS
+Previous incumbents: `20261016T061500-dgsw2l-unet-ema` (deterministic U-Net
+with EMA; 6-seed epochs 30-60 149.6, final 146.4); `20261015T204500-dgsw2l-unet-multiscale` (U-Net, MPS
 final 155.8 / 148.0; CUDA 3-seed final 148.9, epochs 30-60 167.1);
 `20261015T191000-dgsw2l-noise-injection` (CNN, 215.7).
 
@@ -398,3 +401,48 @@ persistence). Track both MSE and variance/KE diagnostics.
 - Hypothesis: See 20261016T130000-dgsw2l-unet-ema-batch-b4.
 - Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 268.5 / 420.3 / 0.006442 (std 0.87, KE 1.20); 10: 236.6 / 362.4 / 0.002954 (std 0.83, KE 0.50); 15: 194.8 / 318.6 / 0.002563 (std 0.86, KE 0.42); 20: 175.6 / 297.8 / 0.002289 (std 0.91, KE 0.51); 25: 167 / 275.2 / 0.002149 (std 0.95, KE 0.66); 30: 139.7 / 264.9 / 0.0019 (std 0.97, KE 0.77); 35: 138.2 / 338.2 / 0.001798 (std 0.97, KE 0.85); 40: 156.5 / 316.9 / 0.001957 (std 0.97, KE 0.89); 45: 166.4 / 319.8 / 0.002032 (std 0.98, KE 0.92); 50: 145.5 / 309.8 / 0.002001 (std 0.98, KE 0.93); 55: 136.7 / 226.5 / 0.002109 (std 0.98, KE 0.95); 60: 123.1 / 233.6 / 0.001916 (std 0.98, KE 0.94)
 - Conclusion: Extra incumbent seed; see 20261016T130000-dgsw2l-unet-ema-batch-b4.
+
+### 20261016T140000-dgsw2l-unet-ema-crps — bigger_jump
+- Hypothesis: A stochastic U-Net (4 noise channels) trained with two-member fair CRPS plus EMA keeps every scheduled rollout bounded, keeps KE and h-std ratios within 0.9-1.1 at the final rollout step (vs ~0.75-0.85 KE for the incumbent), and stays within ~10% of the incumbent's 6-seed scores (epochs 30-60 149.6, final 146.4).
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 272.5 / 445.8 / 0.00745 (std 1.00, KE 1.36); 10: 231.7 / 480.2 / 0.003465 (std 1.07, KE 0.59); 15: 216.6 / 450.4 / 0.002925 (std 1.06, KE 0.47); 20: 202.6 / 341.8 / 0.002643 (std 1.02, KE 0.58); 25: 208.7 / 361.1 / 0.002499 (std 1.01, KE 0.74); 30: 146 / 372.4 / 0.00166 (std 1.01, KE 0.83); 35: 149.8 / 271.9 / 0.001719 (std 0.99, KE 0.89); 40: 166.9 / 277.9 / 0.001893 (std 0.98, KE 0.92); 45: 127.3 / 189.8 / 0.001703 (std 0.98, KE 0.92); 50: 119.9 / 220.2 / 0.001716 (std 0.98, KE 0.93); 55: 150.7 / 399.5 / 0.002094 (std 0.98, KE 0.93); 60: 147.6 / 437.8 / 0.002109 (std 0.97, KE 0.93)
+- Conclusion: Supported; promoted to incumbent on fidelity and mid-lead skill at equal primary score (6-vs-6 seeds, user priority: physical realism). A stochastic U-Net (4 fresh noise channels per step) trained with two-member fair CRPS over 8-step unrolls, with start-state noise and EMA 0.998, over seeds 42/7/123/11/19/23 vs the EMA incumbent's six seeds: epochs 30-60 eval_mse_mean 145.4 +/- 1.3 vs 149.6 +/- 2.8 (level within noise, half the seed spread); final 151.1 +/- 3.6 vs 146.4 +/- 7.3 (level); velocity MSE 0.00195 vs 0.00206 (better); step-20 thickness MSE at epoch 60 15.0 vs 21.3 (clearly better); KE ratio at the last rollout step 0.86 vs 0.80 (clearly more energetic, realistic eddies late in the run); h-std ratio 0.99-1.00. Each rollout is one sharp ensemble member, not a conditional mean. Without start-state noise (crps-nonoise arm) it is worse (3-seed epochs 30-60 157.9, final 166.3), so noise injection is still needed. Seed-42 rollout regenerated locally (fresh noise draw): 147.3 / 435.6 / 0.00212; decomposition MSE 147.3 = bias^2 14.7 + var_truth 125.2 + var_model 106.3 - 2cov 98.8.
+
+### 20261016T140000-dgsw2l-unet-ema-crps-nonoise — tuning
+- Hypothesis: A stochastic U-Net (4 noise channels) trained with two-member fair CRPS plus EMA keeps every scheduled rollout bounded, keeps KE and h-std ratios within 0.9-1.1 at the final rollout step (vs ~0.75-0.85 KE for the incumbent), and stays within ~10% of the incumbent's 6-seed scores (epochs 30-60 149.6, final 146.4).
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 287.9 / 504.7 / 0.007473 (std 1.02, KE 1.42); 10: 255.3 / 516.7 / 0.003436 (std 1.09, KE 0.71); 15: 217.4 / 400.3 / 0.002722 (std 1.05, KE 0.57); 20: 208.8 / 308.5 / 0.00241 (std 1.02, KE 0.65); 25: 196.1 / 274.1 / 0.002291 (std 1.02, KE 0.74); 30: 183 / 279.4 / 0.002076 (std 1.01, KE 0.83); 35: 142 / 277.3 / 0.001793 (std 0.99, KE 0.89); 40: 168.5 / 321.5 / 0.002145 (std 1.00, KE 0.93); 45: 156.7 / 404.3 / 0.00223 (std 0.98, KE 0.94); 50: 167.9 / 374.3 / 0.002504 (std 0.98, KE 0.93); 55: 146.9 / 384.9 / 0.002218 (std 0.98, KE 0.94); 60: 164.2 / 441.9 / 0.002243 (std 0.98, KE 0.95)
+- Conclusion: Arm without start-state noise; worse (3-seed epochs 30-60 mean 157.9, final 166.3). See 20261016T140000-dgsw2l-unet-ema-crps.
+
+### 20261016T140000-dgsw2l-unet-ema-crps-seed7 — tuning
+- Hypothesis: See 20261016T140000-dgsw2l-unet-ema-crps.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 269.6 / 399.5 / 0.01486 (std 0.90, KE 2.73); 10: 213 / 318.5 / 0.004178 (std 0.89, KE 0.67); 15: 202.8 / 370.9 / 0.002685 (std 0.96, KE 0.41); 20: 222.1 / 338.9 / 0.00244 (std 1.03, KE 0.61); 25: 197.5 / 343.9 / 0.00231 (std 1.02, KE 0.73); 30: 148.5 / 307.8 / 0.001664 (std 0.99, KE 0.81); 35: 141.1 / 249.1 / 0.001618 (std 0.99, KE 0.88); 40: 145.9 / 403 / 0.001851 (std 0.98, KE 0.91); 45: 155.9 / 461.6 / 0.00205 (std 0.98, KE 0.92); 50: 155.5 / 468.2 / 0.002173 (std 0.98, KE 0.92); 55: 149.5 / 448.9 / 0.002189 (std 0.98, KE 0.93); 60: 151.5 / 466.5 / 0.002152 (std 0.97, KE 0.93)
+- Conclusion: Seed replica; see 20261016T140000-dgsw2l-unet-ema-crps.
+
+### 20261016T140000-dgsw2l-unet-ema-crps-seed123 — tuning
+- Hypothesis: See 20261016T140000-dgsw2l-unet-ema-crps.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 280.7 / 426.3 / 0.008411 (std 0.92, KE 1.58); 10: 212.2 / 304.9 / 0.003169 (std 0.90, KE 0.59); 15: 192.5 / 306.7 / 0.002583 (std 0.94, KE 0.47); 20: 198.6 / 291.5 / 0.002548 (std 0.97, KE 0.64); 25: 189.5 / 268.5 / 0.002293 (std 0.98, KE 0.80); 30: 131.2 / 265.8 / 0.00147 (std 0.99, KE 0.84); 35: 138.6 / 252.3 / 0.001637 (std 0.99, KE 0.89); 40: 138.3 / 371.3 / 0.001865 (std 0.99, KE 0.91); 45: 152 / 458.3 / 0.002128 (std 0.99, KE 0.93); 50: 144.1 / 470.6 / 0.002101 (std 0.99, KE 0.93); 55: 157.7 / 341.8 / 0.00233 (std 0.99, KE 0.94); 60: 163.7 / 442.4 / 0.002486 (std 0.98, KE 0.94)
+- Conclusion: Seed replica; see 20261016T140000-dgsw2l-unet-ema-crps.
+
+### 20261016T140000-dgsw2l-unet-ema-crps-seed11 — tuning
+- Hypothesis: See 20261016T140000-dgsw2l-unet-ema-crps.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 244.3 / 332.5 / 0.008179 (std 0.92, KE 1.45); 10: 187.8 / 255.9 / 0.003167 (std 0.89, KE 0.45); 15: 174.5 / 262 / 0.002697 (std 0.89, KE 0.38); 20: 173.4 / 289.2 / 0.002324 (std 0.95, KE 0.50); 25: 177.1 / 283.4 / 0.002279 (std 0.98, KE 0.69); 30: 132.3 / 330.9 / 0.001496 (std 1.00, KE 0.81); 35: 142 / 223.2 / 0.001913 (std 0.99, KE 0.88); 40: 162.9 / 378.7 / 0.002373 (std 0.99, KE 0.91); 45: 146.9 / 467.9 / 0.002231 (std 0.98, KE 0.93); 50: 146.6 / 413.2 / 0.002269 (std 0.98, KE 0.93); 55: 152.8 / 444.2 / 0.002396 (std 0.98, KE 0.94); 60: 153.4 / 452.3 / 0.002334 (std 0.98, KE 0.94)
+- Conclusion: Seed replica; see 20261016T140000-dgsw2l-unet-ema-crps.
+
+### 20261016T140000-dgsw2l-unet-ema-crps-seed19 — tuning
+- Hypothesis: See 20261016T140000-dgsw2l-unet-ema-crps.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 252.1 / 368 / 0.007192 (std 0.97, KE 1.35); 10: 202.3 / 287.8 / 0.003199 (std 0.90, KE 0.57); 15: 180.5 / 305.1 / 0.002806 (std 0.95, KE 0.48); 20: 193.3 / 322.3 / 0.002568 (std 1.02, KE 0.59); 25: 195.2 / 291.4 / 0.002359 (std 1.02, KE 0.75); 30: 162.6 / 279.6 / 0.001849 (std 1.01, KE 0.85); 35: 116.3 / 195.9 / 0.001419 (std 1.00, KE 0.88); 40: 136.1 / 300.9 / 0.001888 (std 0.98, KE 0.91); 45: 141.9 / 344 / 0.001897 (std 0.98, KE 0.93); 50: 164.5 / 303.9 / 0.001994 (std 1.00, KE 0.94); 55: 136.9 / 280.9 / 0.002061 (std 0.99, KE 0.93); 60: 136.9 / 348.3 / 0.002176 (std 0.99, KE 0.94)
+- Conclusion: Seed replica; see 20261016T140000-dgsw2l-unet-ema-crps.
+
+### 20261016T140000-dgsw2l-unet-ema-crps-seed23 — tuning
+- Hypothesis: See 20261016T140000-dgsw2l-unet-ema-crps.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 230.9 / 333.1 / 0.009958 (std 0.91, KE 1.89); 10: 212.7 / 290.2 / 0.00352 (std 0.85, KE 0.72); 15: 221.5 / 294.3 / 0.002519 (std 0.82, KE 0.51); 20: 193.5 / 292.3 / 0.002325 (std 0.89, KE 0.61); 25: 187.8 / 266.4 / 0.002195 (std 0.94, KE 0.72); 30: 150 / 285.3 / 0.001736 (std 0.96, KE 0.80); 35: 133.3 / 233.5 / 0.00157 (std 0.96, KE 0.88); 40: 143.6 / 261.5 / 0.001699 (std 0.97, KE 0.91); 45: 140.2 / 293.7 / 0.001791 (std 0.98, KE 0.92); 50: 159.1 / 308.8 / 0.001987 (std 0.98, KE 0.94); 55: 114.8 / 253.1 / 0.001832 (std 0.98, KE 0.93); 60: 153.8 / 437.3 / 0.002245 (std 0.98, KE 0.95)
+- Conclusion: Seed replica; see 20261016T140000-dgsw2l-unet-ema-crps.
+
+### 20261016T140000-dgsw2l-unet-ema-crps-nonoise-seed7 — tuning
+- Hypothesis: See 20261016T140000-dgsw2l-unet-ema-crps-nonoise.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 295.9 / 476.7 / 0.01559 (std 0.91, KE 2.84); 10: 276.1 / 436.6 / 0.005155 (std 0.90, KE 0.89); 15: 233.1 / 392.1 / 0.003248 (std 0.97, KE 0.54); 20: 239.3 / 425.7 / 0.002733 (std 1.01, KE 0.61); 25: 212.8 / 355.8 / 0.002434 (std 1.01, KE 0.82); 30: 156.2 / 371.5 / 0.001722 (std 0.99, KE 0.88); 35: 166.2 / 293.5 / 0.002235 (std 0.98, KE 0.91); 40: 133.7 / 423 / 0.001874 (std 0.98, KE 0.92); 45: 168.1 / 412.1 / 0.002302 (std 0.97, KE 0.94); 50: 130.3 / 240.5 / 0.002007 (std 0.98, KE 0.95); 55: 150.4 / 399.6 / 0.001938 (std 0.98, KE 0.95); 60: 166.9 / 480.4 / 0.002456 (std 0.98, KE 0.95)
+- Conclusion: Seed replica; see 20261016T140000-dgsw2l-unet-ema-crps-nonoise.
+
+### 20261016T140000-dgsw2l-unet-ema-crps-nonoise-seed123 — tuning
+- Hypothesis: See 20261016T140000-dgsw2l-unet-ema-crps-nonoise.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 294.8 / 449.6 / 0.007265 (std 0.89, KE 1.35); 10: 243.1 / 345.1 / 0.003365 (std 0.85, KE 0.60); 15: 202.7 / 289.1 / 0.002778 (std 0.88, KE 0.46); 20: 223.3 / 382.6 / 0.002555 (std 1.02, KE 0.52); 25: 227.6 / 363.6 / 0.002469 (std 1.03, KE 0.75); 30: 163.4 / 364.1 / 0.001902 (std 0.99, KE 0.85); 35: 149.1 / 347.3 / 0.001841 (std 0.99, KE 0.91); 40: 148.6 / 387 / 0.001861 (std 0.98, KE 0.93); 45: 160.1 / 391 / 0.00202 (std 0.99, KE 0.94); 50: 161.8 / 435.8 / 0.002311 (std 0.97, KE 0.94); 55: 163.8 / 476.8 / 0.002176 (std 0.97, KE 0.96); 60: 167.9 / 466.6 / 0.002398 (std 0.98, KE 0.95)
+- Conclusion: Seed replica; see 20261016T140000-dgsw2l-unet-ema-crps-nonoise.
