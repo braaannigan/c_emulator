@@ -1,0 +1,89 @@
+experiment:
+  id: 20261017T090000-dgsw2l-crps-smooth-increment
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: crps-smooth-increment
+  kind: medium_step
+  rationale: 'The new fidelity diagnostics show the CRPS incumbent''s main realism defect:
+    beyond ~0.1 cycles/cell (100 km) the truth''s wavenumber spectrum falls 5-6 decades (the
+    Aronnax run is viscous) while the emulator flattens into a grid-scale noise floor (small-scale
+    band power ~10^4 x truth), fed by the per-step stochastic inputs; there are also spurious
+    variance streaks along the wall columns. A fixed, land-aware Gaussian smoothing of each
+    step''s increment (sigma 1 cell: transfer 0.95 at 0.05, 0.82 at 0.1, 0.17 at 0.3 cycles/cell)
+    acts as scale-selective dissipation, the emulator''s analogue of the source model''s viscosity,
+    while the network trains through it and can pre-compensate at resolved scales. Physical-formulation
+    change to the stepper output; single seed (42) per budget rule, with remote fidelity diagnostics.'
+  hypothesis: Gaussian increment smoothing (sigma 1 cell) cuts the small-scale (0.2-0.5 cycles/cell)
+    thickness spectrum ratio on the held-out period by at least 10x from the incumbent's ~6900
+    (L0), removes the wall streaks, keeps the large/eddy-band spectrum ratios within 0.8-1.2
+    and KE ratio >= 0.85, and keeps the seed-42 epochs 30-60 eval_mse_mean within ~6 of the
+    incumbent's seed-42 144.0.
+  conclusion: 'Supported; promoted to incumbent on physical fidelity at equal primary score
+    (3 seeds; user priority: realism). Land-aware Gaussian smoothing of each step''s increment
+    (sigma 1 cell) on the CRPS incumbent. Seeds 42/7/123 vs the CRPS incumbent''s same seeds:
+    epochs 30-60 eval_mse_mean 163.9 / 148.7 / 142.0 (mean 151.5) vs 144.0 / 149.7 / 146.5
+    (mean 146.7); final 142.2 / 157.8 / 128.7 (mean 142.9) vs 147.6 / 151.5 / 163.7 (mean
+    154.3): level within seed noise. Fidelity diagnostics (seed 42): grid-scale (0.2-0.5 cycles/cell)
+    thickness spectrum excess over truth cut ~20x (held-out L0 337 vs 6852; 25-year run 3036
+    vs 65120); 25-year upper-layer KE now ends inside the truth''s yearly range (0.0055 vs
+    0.0059 for the CRPS model; truth max 0.0055); long-run KE ratio 1.02 vs 1.06; EKE maps
+    correlation 0.97-0.99; eddy-band held-out spectrum ratio slightly lower (L0 0.83 vs 0.94).
+    Remaining defects: wall streaks reduced but present; held-out upper-layer EKE amplitude
+    0.74 of truth. Velocity MSE 0.0019-0.0020 (level). Seed-42 rollout regenerated locally:
+    135.5 / 377.0 / 0.00199. Seed 123 ran on the 16 GB endpoint in 1786 s (vs 650-880 s on
+    an RTX 4090).'
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261017T090000-dgsw2l-crps-smooth-increment.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+  ema_decay: 0.998
+  loss: crps
+model:
+  type: unet
+  hidden_channels: 32
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+  depth: 3
+  stochastic_channels: 4
+  increment_smoothing: 1.0
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '

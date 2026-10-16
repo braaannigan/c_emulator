@@ -91,3 +91,28 @@ def test_stochastic_channels_make_each_call_a_fresh_member():
     assert not torch.allclose(first, second)
     deterministic = StateStepper(FirstExtraChannel(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual")
     torch.testing.assert_close(deterministic(state, wind), deterministic(state, wind))
+
+
+class Spike(torch.nn.Module):
+    """Residual net returning a single-cell spike in every channel."""
+
+    def forward(self, x):
+        out = torch.zeros_like(x[:, :6])
+        out[:, :, 4, 4] = 1.0
+        return out
+
+
+def test_increment_smoothing_spreads_spikes_and_spares_land():
+    with pytest.raises(ValueError):
+        StateStepper(Spike(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), increment_smoothing=-1.0)
+    mask = np.zeros((9, 9), dtype=bool)
+    mask[0] = True
+    values = np.zeros((6, 9, 9), dtype="float32")
+    smooth = StateStepper(Spike(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual", fixed_mask=mask, fixed_values=values, increment_smoothing=1.0)
+    out = smooth(torch.zeros(1, 6, 9, 9), torch.zeros(1, 9, 9))
+    assert float(out[0, 0, 4, 4]) < 0.5 and float(out[0, 0, 4, 5]) > 0.0
+    torch.testing.assert_close(out[:, :, 0], torch.zeros(1, 6, 9))
+    plain = StateStepper(Spike(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual", increment_smoothing=1.0, mass_conserving=True)
+    out = plain(torch.zeros(1, 6, 9, 9), torch.zeros(1, 9, 9))
+    torch.testing.assert_close(out[:, :2].mean(dim=(2, 3)), torch.zeros(1, 2), atol=1e-6, rtol=0)
+    assert float(out[0, 2, 4, 4]) < 0.5
