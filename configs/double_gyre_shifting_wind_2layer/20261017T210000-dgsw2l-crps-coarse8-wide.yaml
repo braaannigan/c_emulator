@@ -15,7 +15,12 @@ experiment:
     climate there.'
   hypothesis: 'A 48-channel U-Net lowers seed-42 predictable-range MSE below ~16.5 (8x model:
     17.7) with realism <= ~0.75 and drift <= ~0.2, and benchmark MSE within seed noise.'
-  conclusion: null
+  conclusion: 'Promising (seed 42, local Mac; seeds 7 and 123 queued on the hourly pod). A
+    48-channel U-Net (~4.4M params) on the 8x coarse-noise incumbent: predictable-range MSE
+    15.1 (incumbent seed 42 17.7; 4-seed mean 17.5), epochs 30-60 eval_mse_mean 143 (152.5),
+    final 157 (157.6), realism 0.75 (0.70), grid-noise excess 1.04 decades (0.97), long-run
+    drift 0.04 (0.12; 25-year KE 0.00477 -> 0.00481, flat inside the truth range). Unlike
+    depth-4 under MSE, extra width does not over-fit under the CRPS objective.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
