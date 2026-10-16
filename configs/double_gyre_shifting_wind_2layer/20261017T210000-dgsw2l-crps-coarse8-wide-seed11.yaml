@@ -7,7 +7,10 @@ experiment:
   rationale: Seed replica of 20261017T210000-dgsw2l-crps-coarse8-wide, run locally on the
     Mac alongside seeds 7 and 123 on the hourly pod.
   hypothesis: See 20261017T210000-dgsw2l-crps-coarse8-wide.
-  conclusion: null
+  conclusion: 'Seed replica of 20261017T210000-dgsw2l-crps-coarse8-wide (run on the hourly
+    pod; first attempt ran out of GPU memory while sharing, retried alone). 4-seed result:
+    predictable-range MSE 16.4 vs 17.5, epochs 30-60 149 vs 152, final 162 vs 158, realism
+    0.74 vs 0.70, drift 0.05 vs 0.23 - promotion holds.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

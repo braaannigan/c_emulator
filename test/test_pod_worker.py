@@ -40,7 +40,7 @@ def test_run_queue_retries_out_of_memory_jobs_serially(tmp_path):
     def runner(job, work_dir, volume_dir):
         calls.append(job["config"])
         if job["config"] == "big" and calls.count("big") == 1:
-            return {"returncode": 1, "stderr_tail": "torch.OutOfMemoryError: CUDA out of memory"}
+            return {"returncode": 1, "stderr_tail": "RuntimeError: cuDNN error: CUDNN_STATUS_INTERNAL_ERROR"}
         return {"experiment_id": job["config"], "returncode": 0}
 
     results = run_queue([{"config": "a"}, {"config": "big"}], tmp_path / "vol", tmp_path / "work", concurrency=2, runner=runner)

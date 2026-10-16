@@ -1,0 +1,74 @@
+experiment:
+  id: 20261018T010000-dgsw2l-crps-shared-smooth15
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: crps-shared-smooth15
+  kind: medium_step
+  rationale: 'The shared-start CRPS model (start noise 0.5) is the first nearly calibrated
+    ensemble (spread/error 0.77 / 0.85, ensemble mean 123.9 < climatology) but drifts: persistent
+    +/-100 m upper-layer anomalies along the western boundary after ~20 years and inf e-folding
+    time. Stronger scale-selective dissipation (increment smoothing sigma 1.5 instead of 1)
+    is the simplest drift control to test, damping the small-scale stochastic increments that
+    may accumulate into the persistent anomalies. 32-channel model, paired on the pod with
+    the 64-channel run.'
+  hypothesis: Smoothing sigma 1.5 removes the long-run drift of the shared-start model (finite
+    upper-layer e-folding, drift score <= 0.15, no persistent western-boundary anomalies)
+    while keeping spread/error within 0.6-1.3 and member realism <= ~0.95.
+  conclusion: null
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261018T010000-dgsw2l-crps-shared-smooth15.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 0.5
+  ema_decay: 0.998
+  loss: crps
+  crps_shared_start_noise: true
+model:
+  type: unet
+  hidden_channels: 32
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+  depth: 3
+  stochastic_channels: 4
+  increment_smoothing: 1.5
+  stochastic_scale: 8
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '

@@ -24,6 +24,9 @@ from typing import Any
 
 from src.remote.job import json_safe, run_job
 
+# Failures that mean "the GPU was too full while sharing it": retried alone.
+MEMORY_ERRORS = ("OutOfMemoryError", "CUDA out of memory", "CUDNN_STATUS_INTERNAL_ERROR", "CUBLAS_STATUS_ALLOC_FAILED")
+
 JobRunner = Callable[[dict[str, Any], Path, Path], dict[str, Any]]
 
 
@@ -47,7 +50,7 @@ def run_queue(jobs: list[dict[str, Any]], volume_dir: Path, work_dir: Path, conc
         results = list(pool.map(one, enumerate(jobs)))
     # Jobs that ran out of GPU memory alongside others are retried one at a time.
     for index, result in enumerate(results):
-        if "OutOfMemoryError" in str(result.get("stderr_tail", "")):
+        if any(sign in str(result.get("stderr_tail", "")) for sign in MEMORY_ERRORS):
             results[index] = one((index, jobs[index]))
     (volume_dir / "DONE").write_text(json.dumps([r.get("experiment_id") or r.get("error") for r in results]) + "\n")
     return results

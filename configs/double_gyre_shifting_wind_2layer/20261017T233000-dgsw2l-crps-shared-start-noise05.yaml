@@ -1,0 +1,81 @@
+experiment:
+  id: 20261017T233000-dgsw2l-crps-shared-start-noise05
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: crps-shared-start-noise05
+  kind: tuning
+  rationale: Shared start noise made the CRPS model genuinely stochastic (spread/error 0.95
+    at long leads) but over-dispersive early (1.49 over steps 1-26), costing member skill
+    (predictable-range MSE 40.5). The learned spread must cover the 1-increment-std shared
+    start perturbation that is absent at evaluation; halving it should shrink early spread
+    while keeping the stochastic inputs in use.
+  hypothesis: Shared start noise of 0.5 brings the steps 1-26 spread/error ratio to 0.7-1.3
+    while keeping the long-lead ratio >= 0.7, and recovers member predictable-range MSE below
+    ~25 and realism below ~0.85.
+  conclusion: 'Not promoted; best calibrated ensemble so far. Halving the shared start noise
+    (0.5) fixes the early over-dispersion: held-out spread/error 0.77 over steps 1-26 and
+    0.85 beyond (vs 1.49 / 0.95 at 1.0), and the 4-member ensemble mean scores eval_mse_mean
+    123.9 (climatology 136.8). Individual members remain worse and less realistic than the
+    incumbent: epochs 30-60 / final 179 / 165 (incumbent 152.5 / 157.6), predictable-range
+    MSE 29.3 (17.5), realism 0.99 (0.72), grid-noise excess 1.6 decades (0.97); drift 0.16
+    (0.12-0.23). Red flag: in the 25-year run the upper-layer thickness autocorrelation never
+    falls below 1/e within 20 steps (e-folding = inf vs truth 7.7), suggesting a persistent
+    long-run state. This inf in the diagnostics report made RunPod drop the job output twice
+    (fixed: worker output is now strict JSON); results were recovered from the volume.'
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261017T233000-dgsw2l-crps-shared-start-noise05.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 0.5
+  ema_decay: 0.998
+  loss: crps
+  crps_shared_start_noise: true
+model:
+  type: unet
+  hidden_channels: 32
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+  depth: 3
+  stochastic_channels: 4
+  increment_smoothing: 1.0
+  stochastic_scale: 8
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '
