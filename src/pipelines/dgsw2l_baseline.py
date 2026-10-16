@@ -124,7 +124,8 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
     static = static_context(static_fields or [], state, train_indices, norm.input_mean, norm.input_std)
     n_static = 0 if static is None else static.shape[0]
     fixed_mask, fixed_values = fixed_cell_mask(state, train_indices) if model_cfg.get("fixed_land_cells", False) else (None, None)
-    net = build_state_model(model_cfg, inputs.shape[1] + n_static, state.shape[1])
+    stochastic_channels = int(model_cfg.get("stochastic_channels", 0))
+    net = build_state_model(model_cfg, inputs.shape[1] + n_static + stochastic_channels, state.shape[1])
     return StateStepper(
         net,
         norm.input_mean,
@@ -136,6 +137,7 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
         static=static,
         fixed_mask=fixed_mask,
         fixed_values=fixed_values,
+        stochastic_channels=stochastic_channels,
     )
 
 
@@ -161,6 +163,36 @@ def unrolled_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tens
     return loss / steps
 
 
+def unrolled_crps_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tensor, noise_std: float = 0.0) -> torch.Tensor:
+    """Fair CRPS of a two-member ensemble, averaged over unrolled steps.
+
+    Each window is rolled out twice with independent stochastic inputs (and
+    independent start-state noise). For two members the fair CRPS per value
+    is ``(|x1 - y| + |x2 - y|) / 2 - |x1 - x2| / 2`` (in output-std units),
+    which is minimised by members drawn from the true conditional
+    distribution, so members stay sharp instead of regressing to the mean.
+    """
+
+    batch = states.shape[0]
+    pair_states = states.repeat(2, 1, 1, 1, 1)
+    current = pair_states[:, 0]
+    if noise_std > 0:
+        noise = torch.randn_like(current) * stepper.output_std * noise_std
+        if stepper.fixed_mask.numel():
+            noise = noise.masked_fill(stepper.fixed_mask, 0.0)
+        current = current + noise
+    pair_winds = winds.repeat(2, 1, 1, 1)
+    steps = winds.shape[1]
+    loss = states.new_zeros(())
+    for k in range(steps):
+        current = stepper(current, pair_winds[:, k])
+        first, second = current[:batch] / stepper.output_std, current[batch:] / stepper.output_std
+        target = states[:, k + 1] / stepper.output_std
+        crps = 0.5 * ((first - target).abs() + (second - target).abs()) - 0.5 * (first - second).abs()
+        loss = loss + crps.mean()
+    return loss / steps
+
+
 def train_one_epoch(
     stepper: StateStepper,
     loader: DataLoader,
@@ -169,6 +201,7 @@ def train_one_epoch(
     gradient_clip_norm: float | None = None,
     noise_std: float = 0.0,
     ema: AveragedModel | None = None,
+    loss_name: str = "mse",
 ) -> float:
     stepper.train()
     losses: list[float] = []
@@ -176,7 +209,7 @@ def train_one_epoch(
         states = states.to(device)
         winds = winds.to(device)
         optimiser.zero_grad(set_to_none=True)
-        loss = unrolled_loss(stepper, states, winds, noise_std)
+        loss = (unrolled_crps_loss if loss_name == "crps" else unrolled_loss)(stepper, states, winds, noise_std)
         loss.backward()
         if gradient_clip_norm is not None:
             torch.nn.utils.clip_grad_norm_(stepper.parameters(), gradient_clip_norm)
@@ -260,6 +293,9 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     train_indices, eval_indices = dgsw2l_pair_split(len(state), config.train_fraction)
     unroll_steps = int(config.raw.get("training", {}).get("unroll_steps", 1))
     noise_std = float(config.raw.get("training", {}).get("input_noise_std", 0.0))
+    loss_name = str(config.raw.get("training", {}).get("loss", "mse"))
+    if loss_name not in {"mse", "crps"}:
+        raise ValueError(f"unknown training loss {loss_name!r}")
     dataset = RolloutWindowDataset(state, forcing, train_indices, unroll_steps)
     loader = DataLoader(dataset, batch_size=config.batch_size, shuffle=True)
     model_cfg = config.raw.get("model", {})
@@ -289,6 +325,8 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
             "unroll_steps": unroll_steps,
             "ema_decay": config.raw.get("training", {}).get("ema_decay"),
             "input_noise_std": noise_std,
+            "training_loss": loss_name,
+            "stochastic_channels": stepper.stochastic_channels,
             "static_fields": static_fields,
             "fixed_land_cells": bool(stepper.fixed_mask.numel()),
             "primary_metric": "layer-thickness MSE of fully autoregressive rollout (src/evaluation.py)",
@@ -308,7 +346,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     emulator = StepperEmulator(eval_stepper, device)
     for epoch in range(1, epochs + 1):
         started = time.perf_counter()
-        loss = train_one_epoch(stepper, loader, optimiser, device, gradient_clip_norm=config.gradient_clip_norm, noise_std=noise_std, ema=ema)
+        loss = train_one_epoch(stepper, loader, optimiser, device, gradient_clip_norm=config.gradient_clip_norm, noise_std=noise_std, ema=ema, loss_name=loss_name)
         elapsed = time.perf_counter() - started
         log["epochs"].append(
             {
