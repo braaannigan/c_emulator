@@ -111,6 +111,7 @@ def record(outputs: Path, checkpoints: bool) -> None:
 
 
 def main() -> None:
+    global ROOT, FAMILY
     parser = argparse.ArgumentParser(description="Run experiments on an hourly RunPod GPU pod")
     parser.add_argument("--job", action="append", required=True, help="<git ref>:<config path>")
     parser.add_argument("--concurrency", type=int, default=3)
@@ -124,7 +125,6 @@ def main() -> None:
     parser.add_argument("--keep", action="store_true", help="Do not delete the pod at the end")
     parser.add_argument("--output-root", type=Path, default=ROOT, help="Repository root whose data/ receives the results")
     args = parser.parse_args()
-    global ROOT, FAMILY
     ROOT, FAMILY = args.output_root, args.output_root / "data" / "double_gyre_shifting_wind_2layer"
     jobs = []
     for spec in args.job:
