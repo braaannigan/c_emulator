@@ -32,3 +32,18 @@ def test_run_queue_runs_jobs_concurrently_and_records_results(tmp_path):
     assert results[1]["work"].endswith("job1")
     with pytest.raises(ValueError):
         run_queue(jobs, tmp_path, tmp_path, concurrency=0, runner=runner)
+
+
+def test_run_queue_retries_out_of_memory_jobs_serially(tmp_path):
+    calls = []
+
+    def runner(job, work_dir, volume_dir):
+        calls.append(job["config"])
+        if job["config"] == "big" and calls.count("big") == 1:
+            return {"returncode": 1, "stderr_tail": "torch.OutOfMemoryError: CUDA out of memory"}
+        return {"experiment_id": job["config"], "returncode": 0}
+
+    results = run_queue([{"config": "a"}, {"config": "big"}], tmp_path / "vol", tmp_path / "work", concurrency=2, runner=runner)
+    assert calls.count("big") == 2
+    assert results[1] == {"experiment_id": "big", "returncode": 0}
+    assert json.loads((tmp_path / "vol" / "outputs" / "big" / "result.json").read_text())["returncode"] == 0

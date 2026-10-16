@@ -9,7 +9,8 @@ result is written to ``<volume>/outputs/<experiment-id or index>/result.json``
 next to the outputs ``run_job`` already copies there, and ``<volume>/DONE`` is
 written when the whole queue has finished, so a local orchestrator can poll
 and copy results back. A small model leaves most of a GPU idle, so running a
-few jobs concurrently costs little extra time per job.
+few jobs concurrently costs little extra time per job; jobs that run out of
+GPU memory while sharing are retried one at a time at the end.
 """
 
 from __future__ import annotations
@@ -44,6 +45,10 @@ def run_queue(jobs: list[dict[str, Any]], volume_dir: Path, work_dir: Path, conc
 
     with ThreadPoolExecutor(max_workers=concurrency) as pool:
         results = list(pool.map(one, enumerate(jobs)))
+    # Jobs that ran out of GPU memory alongside others are retried one at a time.
+    for index, result in enumerate(results):
+        if "OutOfMemoryError" in str(result.get("stderr_tail", "")):
+            results[index] = one((index, jobs[index]))
     (volume_dir / "DONE").write_text(json.dumps([r.get("experiment_id") or r.get("error") for r in results]) + "\n")
     return results
 
