@@ -6,7 +6,7 @@ experiment:
   kind: tuning
   rationale: Seed replica of 20261016T160000-dgsw2l-crps-tuning-noise05, run in parallel.
   hypothesis: See 20261016T160000-dgsw2l-crps-tuning-noise05.
-  conclusion: null
+  conclusion: Seed replica; see 20261016T160000-dgsw2l-crps-tuning-noise05.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

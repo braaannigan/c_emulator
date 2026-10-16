@@ -10,7 +10,10 @@ experiment:
   hypothesis: Compared with the CRPS incumbent's six seeds (epochs 30-60 145.4 +/- 1.3, final
     151.1 +/- 3.6, KE last 0.86), the change lowers the 3-seed epochs 30-60 mean below ~140
     or raises the KE ratio at the last step above 0.9 without worsening eval_mse_mean.
-  conclusion: null
+  conclusion: 'Rejected. Start-state noise 0.5 with CRPS: 3-seed epochs 30-60 mean 159.6 (170.0
+    / 153.4 / 155.5), final 162.3, velocity MSE 0.0022, KE last 0.83 vs the CRPS incumbent''s
+    145.4 / 151.1 / 0.00195 / 0.86. Start-state noise of 1.0 is still needed even with stochastic
+    inputs.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

@@ -12,7 +12,11 @@ experiment:
   hypothesis: Training the CRPS incumbent on 12-step unrolls lowers the 3-seed epochs 30-60
     mean below ~140 (incumbent 145.4 +/- 1.3) and step-20 error below 15, keeping KE ratio
     at the last step at or above 0.86.
-  conclusion: null
+  conclusion: 'Rejected. 12-step unrolls with CRPS: 3-seed epochs 30-60 154.4 / 157.8 / 151.5
+    (mean 154.6) and finals 148.7 / 171.5 / 166.2 (mean 162.1) vs the CRPS incumbent''s 145.4
+    / 151.1, with lower KE at the last step (0.80-0.86) and 1.5x run time (10-20 min). Even
+    without the blurring incentive of MSE, longer unrolls trade update count and short-lead
+    fit for nothing at mid leads. Keep 8 steps.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

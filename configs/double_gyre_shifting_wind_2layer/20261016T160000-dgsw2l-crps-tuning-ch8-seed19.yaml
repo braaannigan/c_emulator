@@ -7,7 +7,7 @@ experiment:
   rationale: Extra seed of 20261016T160000-dgsw2l-crps-tuning-ch8 for a 6-vs-6 comparison
     with the CRPS incumbent.
   hypothesis: See 20261016T160000-dgsw2l-crps-tuning-ch8.
-  conclusion: null
+  conclusion: Seed replica; see 20261016T160000-dgsw2l-crps-tuning-ch8.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

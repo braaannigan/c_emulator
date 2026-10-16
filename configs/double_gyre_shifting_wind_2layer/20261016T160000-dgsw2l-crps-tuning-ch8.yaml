@@ -10,7 +10,10 @@ experiment:
   hypothesis: Compared with the CRPS incumbent's six seeds (epochs 30-60 145.4 +/- 1.3, final
     151.1 +/- 3.6, KE last 0.86), the change lowers the 3-seed epochs 30-60 mean below ~140
     or raises the KE ratio at the last step above 0.9 without worsening eval_mse_mean.
-  conclusion: null
+  conclusion: 'Neutral, not adopted (6-vs-6 seeds). 8 stochastic channels instead of 4: epochs
+    30-60 148.3 +/- 2.6 vs 145.4 +/- 1.3; final 144.1 +/- 6.6 vs 151.1 +/- 3.6; velocity MSE
+    0.00195 vs 0.00195; KE ratio at the last step 0.87 vs 0.86; step-20 MSE 16.1 vs 15.0.
+    The promising 3-seed result (144.5 / 142.4) did not hold with seeds 11/19/23. Keep 4 channels.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
