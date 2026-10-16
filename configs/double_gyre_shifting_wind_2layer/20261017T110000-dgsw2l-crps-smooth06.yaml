@@ -13,7 +13,13 @@ experiment:
   hypothesis: Sigma 0.6 keeps the eddy-band spectrum ratio >= 0.9 and the seed-42 epochs 30-60
     average within ~6 of the incumbent's 144.0, while still cutting the small-scale noise
     floor by >= 5x vs the incumbent.
-  conclusion: null
+  conclusion: 'Rejected. Gentler increment smoothing (sigma 0.6, seed 42, local Mac run: 60
+    min on MPS vs 30 min on the 16 GB RunPod tier) sits between no smoothing and sigma 1 on
+    every fidelity measure without an MSE gain: grid-scale thickness spectrum excess 1547
+    (held-out L0) vs 337 at sigma 1 and 6852 without smoothing; eddy-band ratio 0.85 (no better
+    than sigma 1''s 0.83); the 25-year upper-layer KE drift returns (yearly 0.0047 -> 0.0062,
+    above the truth''s 0.0055 max). Epochs 30-60 156.1, final 154.6 (sigma-1 seed 42: 163.9
+    / 142.2; no smoothing: 144.0 / 147.6), all inside seed noise. Keep sigma 1.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
