@@ -47,9 +47,18 @@ class EndpointClient:
     def status(self, job_id: str) -> dict[str, Any]:
         return self.transport("GET", f"{self.url}/status/{job_id}", self.headers, None)
 
-    def wait(self, job_id: str, poll_seconds: float = 30.0, sleep: Callable[[float], None] = time.sleep, on_status: Callable[[str], None] = lambda s: None) -> dict[str, Any]:
+    def wait(self, job_id: str, poll_seconds: float = 30.0, sleep: Callable[[float], None] = time.sleep, on_status: Callable[[str], None] = lambda s: None, retries: int = 5) -> dict[str, Any]:
+        failures = 0
         while True:
-            reply = self.status(job_id)
+            try:
+                reply = self.status(job_id)
+            except OSError:  # urllib's HTTPError/URLError: transient API failures
+                failures += 1
+                if failures > retries:
+                    raise
+                sleep(poll_seconds)
+                continue
+            failures = 0
             on_status(str(reply.get("status")))
             if reply.get("status") in TERMINAL_STATUSES:
                 return reply

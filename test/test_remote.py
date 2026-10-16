@@ -231,3 +231,22 @@ def test_json_safe_replaces_non_finite_numbers():
     value = {"a": float("inf"), "b": [1.0, float("nan"), {"c": -float("inf")}], "d": "x", "e": 2}
     assert json_safe(value) == {"a": None, "b": [1.0, None, {"c": None}], "d": "x", "e": 2}
     json.dumps(json_safe(value), allow_nan=False)
+
+
+def test_endpoint_client_wait_retries_transient_errors_then_gives_up():
+    replies = iter([OSError("404"), {"status": "IN_PROGRESS"}, OSError("404"), {"status": "COMPLETED"}])
+
+    def transport(method, url, headers, body):
+        reply = next(replies)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+    sleeps = []
+    assert EndpointClient("ep", "k", transport).wait("j", 1, sleep=sleeps.append, retries=1)["status"] == "COMPLETED"
+
+    def always_fail(method, url, headers, body):
+        raise OSError("down")
+
+    with pytest.raises(OSError):
+        EndpointClient("ep", "k", always_fail).wait("j", 1, sleep=lambda s: None, retries=2)
