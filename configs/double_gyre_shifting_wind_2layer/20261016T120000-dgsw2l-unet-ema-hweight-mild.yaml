@@ -9,7 +9,7 @@ experiment:
     lowers thickness error at short and mid leads and gives a 3-seed epochs 30-60 average
     below 151.5 and a 3-seed final below 147.0 by more than ~10, with velocity MSE rising
     by less than 20% and KE above 0.85.
-  conclusion: null
+  conclusion: Mild arm; see 20261016T120000-dgsw2l-unet-ema-hweight.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

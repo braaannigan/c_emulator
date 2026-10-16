@@ -14,7 +14,13 @@ experiment:
     lowers thickness error at short and mid leads and gives a 3-seed epochs 30-60 average
     below 151.5 and a 3-seed final below 147.0 by more than ~10, with velocity MSE rising
     by less than 20% and KE above 0.85.
-  conclusion: null
+  conclusion: 'Neutral, not adopted. Weighting the unrolled loss toward thickness changes
+    little. Strong (h 2.5, u/v 0.25): 3-seed finals 147.4 / 156.7 / 156.7 (mean 153.6), epochs
+    30-60 155.5 / 152.3 / 151.4 (mean 153.1). Mild (h 1.75, u/v 0.625): finals 171.8 / 149.1
+    / 142.6 (mean 154.5), epochs 30-60 158.2 / 148.4 / 142.0 (mean 149.5). EMA incumbent:
+    147.0 / 151.5. All within the ~10-point standard error; short-lead thickness error is
+    not improved (step-1 0.8-1.0) and velocity MSE is similar (0.0021-0.0023). The velocity
+    channels are not stealing thickness skill; the tail is unchanged.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
