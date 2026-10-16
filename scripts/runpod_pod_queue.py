@@ -2,10 +2,9 @@
 
 Usage:
     uv run python scripts/runpod_pod_queue.py --job <ref>:<config> [--job <ref>:<config> ...]
-        [--concurrency 3] [--diagnostics] [--checkpoints] [--gpu "NVIDIA GeForce RTX 4090"]
-        [--cloud COMMUNITY] [--keep]
+        [--concurrency 3] [--diagnostics] [--checkpoints] [--gpu COMMUNITY:"NVIDIA GeForce RTX 3090" ...] [--keep]
 
-Rents one pod (community cloud by default, billed per hour), uploads the
+Rents one pod (the first available of a preference list, cheapest community cards first, billed per hour), uploads the
 training data once, runs the jobs ``--concurrency`` at a time on the single
 GPU (the model leaves most of a GPU idle), copies each run's log, results row,
 diagnostics report (and optionally checkpoint) back into
@@ -63,13 +62,31 @@ class Pod:
         subprocess.run(["scp", "-q", *self.opts, "-P", self.port, str(local), f"{self.host}:{remote}"], check=True)
 
 
-def create_pod(gpu: str, cloud: str) -> Pod:
-    result = subprocess.run(
-        ["runpodctl", "pod", "create", "--image", IMAGE, "--gpu-id", gpu, "--cloud-type", cloud, "--name", "dgsw2l-queue",
-         "--container-disk-in-gb", "40", "--wait", "--wait-timeout", "15m"],
-        check=True, capture_output=True, text=True,
-    )
-    return Pod(json.loads(result.stdout))
+DEFAULT_GPUS = [
+    "COMMUNITY:NVIDIA GeForce RTX 4090",
+    "COMMUNITY:NVIDIA GeForce RTX 3090",
+    "COMMUNITY:NVIDIA RTX A5000",
+    "SECURE:NVIDIA RTX A5000",
+    "SECURE:NVIDIA GeForce RTX 3090",
+    "SECURE:NVIDIA GeForce RTX 4090",
+]
+
+
+def create_pod(choices: list[str]) -> Pod:
+    """Create a pod with the first available ``CLOUD:gpu-id`` choice, in order of preference."""
+
+    for choice in choices:
+        cloud, gpu = choice.split(":", 1)
+        result = subprocess.run(
+            ["runpodctl", "pod", "create", "--image", IMAGE, "--gpu-id", gpu, "--cloud-type", cloud, "--name", "dgsw2l-queue",
+             "--container-disk-in-gb", "40", "--wait", "--wait-timeout", "15m"],
+            capture_output=True, text=True,
+        )
+        if result.returncode == 0:
+            log(f"got {cloud} {gpu}")
+            return Pod(json.loads(result.stdout))
+        log(f"unavailable: {cloud} {gpu} ({result.stdout.strip()[:120] or result.stderr.strip()[:120]})")
+    raise RuntimeError("no GPU available from the preference list")
 
 
 def upload_data(pod: Pod, pieces: int = 16) -> None:
@@ -118,8 +135,7 @@ def main() -> None:
     parser.add_argument("--diagnostics", action="store_true")
     parser.add_argument("--long-years", type=float, default=25.0)
     parser.add_argument("--checkpoints", action="store_true")
-    parser.add_argument("--gpu", default="NVIDIA GeForce RTX 4090")
-    parser.add_argument("--cloud", default="COMMUNITY", choices=["COMMUNITY", "SECURE"])
+    parser.add_argument("--gpu", action="append", default=None, help="CLOUD:gpu-id in preference order (repeatable); default: cheap community cards first")
     parser.add_argument("--poll-seconds", type=float, default=60.0)
     parser.add_argument("--timeout-hours", type=float, default=6.0)
     parser.add_argument("--keep", action="store_true", help="Do not delete the pod at the end")
@@ -132,8 +148,7 @@ def main() -> None:
         jobs.append({"ref": ref, "config": config, "diagnostics": args.diagnostics, "long_years": args.long_years})
 
     started = time.time()
-    log(f"creating {args.cloud} pod with {args.gpu}")
-    pod = create_pod(args.gpu, args.cloud)
+    pod = create_pod(args.gpu or DEFAULT_GPUS)
     try:
         log(f"pod {pod.id} at {pod.host}:{pod.port}; setting up")
         pod.ssh(SETUP.format(volume=REMOTE_VOLUME))
