@@ -11,7 +11,16 @@ experiment:
   hypothesis: Noise at 8x coarser resolution keeps realism at or below 0.70 and raises the
     final-checkpoint eval_mse_mean no further (seed 42 within ~10 of 167.5), with predictable-range
     MSE within ~1 of 18.3.
-  conclusion: null
+  conclusion: 'Strong candidate, NOT promoted under the strict rule - flagged for a user decision.
+    Noise drawn 8x coarser with increment smoothing, 4 seeds (42/7/123/11) vs the incumbent''s
+    matched 4 seeds: clearly better realism (0.72 vs 0.99), grid-noise excess (0.97 vs 1.45
+    decades) and long-run drift (0.12 vs 0.29; 25-year KE stays inside the truth range), level
+    predictable-range MSE (17.5 +/- 1.1 vs 17.8 +/- 1.1) and epochs 30-60 eval_mse_mean (152.5
+    +/- 2.3 vs 148.0 +/- 5.8), but a final-checkpoint eval_mse_mean 14.5 worse (157.6 +/-
+    2.7 vs 143.1 +/- 5.9, ~2.2 standard errors). The more energetic, more realistic free runs
+    pay ~10% in tail MSE - the realism/MSE trade-off the scorecard was built to expose. Promotion
+    rule requires both benchmark measures within noise; the user''s realism priority may justify
+    promoting it.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

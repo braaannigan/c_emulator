@@ -7,7 +7,7 @@ experiment:
   rationale: Third seed for 20261017T160000-dgsw2l-crps-coarse-noise8, run locally on the
     Mac in parallel with seed 7 on RunPod.
   hypothesis: See 20261017T160000-dgsw2l-crps-coarse-noise8.
-  conclusion: null
+  conclusion: Seed replica; see 20261017T160000-dgsw2l-crps-coarse-noise8.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

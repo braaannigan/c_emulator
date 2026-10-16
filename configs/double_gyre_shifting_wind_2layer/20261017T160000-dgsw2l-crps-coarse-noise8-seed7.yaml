@@ -8,7 +8,7 @@ experiment:
     best predictable-range MSE (17.7) and drift (0.12) yet, realism 0.75 and final eval_mse_mean
     150.8.'
   hypothesis: See 20261017T160000-dgsw2l-crps-coarse-noise8.
-  conclusion: null
+  conclusion: Seed replica; see 20261017T160000-dgsw2l-crps-coarse-noise8.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
