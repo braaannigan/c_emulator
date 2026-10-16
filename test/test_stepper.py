@@ -129,3 +129,16 @@ def test_coarse_stochastic_noise_is_smooth_and_validated():
     a, b = fine(state, wind), coarse(state, wind)
     assert b.shape == a.shape
     assert rough(b) < 0.5 * rough(a)
+
+
+def test_checkpoints_load_with_or_without_the_smoothing_kernel():
+    def build():
+        return StateStepper(AddOne(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), increment_smoothing=1.0)
+
+    state = build().state_dict()
+    assert "smoothing_kernel" not in state
+    build().load_state_dict(state)
+    legacy = dict(state, smoothing_kernel=torch.ones(1))  # written when the kernel was persistent
+    restored = build()
+    restored.load_state_dict(legacy)
+    assert restored.smoothing_kernel.numel() == 7

@@ -29,6 +29,17 @@
   (`scripts/runpod_run.py`, add `--diagnostics` for remote fidelity
   reports) plus one local run on the Mac GPU.
 
+- Scorecard baselines (seed-42 final checkpoints; held-out `predictable_mse`
+  over 26 steps, `realism`, grid-noise excess in decades, 25-year
+  `drift_score`; lower is better): deterministic EMA 20.9 / 0.91 / 1.8 /
+  0.004; CRPS 13.7 / 1.14 / 2.7 / 0.67; smoothed CRPS (incumbent) 14.4 / 0.99
+  / 1.5 / 0.29; sigma-0.6 smoothing - / 1.14 / 2.1 / 0.54. Three-seed
+  epochs 30-60 `predictable_mse` from logs: EMA 21.5, CRPS 17.4, smoothed
+  CRPS 18.8. The stochastic models buy short-range skill at some realism
+  cost (grid noise, and eddy-band power lost to smoothing: eddy-band ratio
+  0.83); the deterministic EMA model has the best spectra and no drift but
+  the weakest short-range skill.
+
 Previous incumbent (CRPS without smoothing):
 `20261016T140000-dgsw2l-unet-ema-crps` - stochastic CRPS U-Net with EMA;
 six-seed epochs 30-60 145.4, final 151.1, KE at the last step 0.86.
@@ -565,3 +576,8 @@ persistence). Track both MSE and variance/KE diagnostics.
 - Hypothesis: See 20261017T090000-dgsw2l-crps-smooth-increment.
 - Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 281.7 / 426.8 / 0.008385 (std 0.92, KE 1.57); 10: 209 / 302.5 / 0.00313 (std 0.89, KE 0.58); 15: 197.1 / 315.8 / 0.002619 (std 0.94, KE 0.49); 20: 213.6 / 347.4 / 0.002595 (std 0.98, KE 0.64); 25: 199.2 / 385 / 0.002547 (std 1.00, KE 0.78); 30: 159.2 / 362 / 0.001976 (std 1.01, KE 0.86); 35: 138.7 / 252.1 / 0.001679 (std 1.00, KE 0.90); 40: 151.5 / 336 / 0.002236 (std 0.99, KE 0.91); 45: 136.3 / 343.5 / 0.002051 (std 0.99, KE 0.93); 50: 122.6 / 304.1 / 0.001865 (std 0.99, KE 0.94); 55: 156.9 / 453 / 0.002221 (std 0.98, KE 0.94); 60: 128.7 / 296.8 / 0.001873 (std 0.99, KE 0.94)
 - Conclusion: Seed replica; see 20261017T090000-dgsw2l-crps-smooth-increment.
+
+### 20261017T110000-dgsw2l-crps-smooth06 — tuning
+- Hypothesis: Sigma 0.6 keeps the eddy-band spectrum ratio >= 0.9 and the seed-42 epochs 30-60 average within ~6 of the incumbent's 144.0, while still cutting the small-scale noise floor by >= 5x vs the incumbent.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 272.8 / 446.7 / 0.007471 (std 1.00, KE 1.36); 10: 231.5 / 473.4 / 0.003443 (std 1.07, KE 0.59); 15: 212.5 / 442.5 / 0.002903 (std 1.05, KE 0.48); 20: 210.4 / 335.4 / 0.00272 (std 1.02, KE 0.61); 25: 205.3 / 335.6 / 0.002448 (std 1.02, KE 0.76); 30: 150 / 368.2 / 0.001719 (std 1.01, KE 0.84); 35: 141.3 / 297.4 / 0.001639 (std 1.00, KE 0.90); 40: 172.5 / 274.8 / 0.001964 (std 0.98, KE 0.92); 45: 164.4 / 400 / 0.001968 (std 0.97, KE 0.93); 50: 160.5 / 297.5 / 0.00189 (std 0.97, KE 0.94); 55: 149.4 / 337.5 / 0.001887 (std 0.97, KE 0.95); 60: 154.6 / 367.5 / 0.00203 (std 0.97, KE 0.95)
+- Conclusion: Rejected. Gentler increment smoothing (sigma 0.6, seed 42, local Mac run: 60 min on MPS vs 30 min on the 16 GB RunPod tier) sits between no smoothing and sigma 1 on every fidelity measure without an MSE gain: grid-scale thickness spectrum excess 1547 (held-out L0) vs 337 at sigma 1 and 6852 without smoothing; eddy-band ratio 0.85 (no better than sigma 1's 0.83); the 25-year upper-layer KE drift returns (yearly 0.0047 -> 0.0062, above the truth's 0.0055 max). Epochs 30-60 156.1, final 154.6 (sigma-1 seed 42: 163.9 / 142.2; no smoothing: 144.0 / 147.6), all inside seed noise. Keep sigma 1.

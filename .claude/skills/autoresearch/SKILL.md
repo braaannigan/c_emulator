@@ -26,6 +26,10 @@ the fixed evaluator, split, or data.
    - Compare full scheduled-rollout sequences, not a single number. Identify the
      incumbent as the best *consistently trained* model. If no results exist,
      run the starter baseline config first.
+   - Use `uv run python scripts/scorecard_table.py <ids>` to compare the
+     benchmark (`eval_mse_mean`) with the secondary scorecard
+     (`predictable_mse`, `realism`, `drift`), grouped over seeds, and apply
+     the promotion rule in `CLAUDE.md`.
 
 2. **Choose experiment kind, generate candidates, select one**
    - Classify every experiment:
@@ -72,7 +76,10 @@ the fixed evaluator, split, or data.
    polling repeatedly.
 
 8. **Analyse and record**
-   - Report each scheduled rollout's `eval_mse_mean`, `eval_mse_last`, `velocity_mse_mean`.
+   - Report each scheduled rollout's `eval_mse_mean`, `eval_mse_last`, `velocity_mse_mean`,
+     and the scorecard (`predictable_mse`, `realism`); for candidates near the
+     incumbent run `scripts/fidelity_diagnostics.py` (or RunPod `--diagnostics`)
+     for `drift`.
    - Write the conclusion into the config's `experiment.conclusion`.
    - Append the experiment to `RESEARCH_LOG.md` (id, kind, hypothesis, metric
      sequence, conclusion) and update the incumbent section.

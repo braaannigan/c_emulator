@@ -82,7 +82,9 @@ class StateStepper(nn.Module):
         radius = int(np.ceil(3 * increment_smoothing))
         offsets = torch.arange(-radius, radius + 1, dtype=torch.float32)
         kernel = torch.exp(-0.5 * (offsets / increment_smoothing) ** 2) if increment_smoothing > 0 else torch.ones(1)
-        self.register_buffer("smoothing_kernel", kernel / kernel.sum())
+        # Derived from the config, so not saved; checkpoints written before or
+        # after this change both load (see _load_from_state_dict).
+        self.register_buffer("smoothing_kernel", kernel / kernel.sum(), persistent=False)
 
     def forward(self, state: torch.Tensor, forcing: torch.Tensor) -> torch.Tensor:
         x = (torch.cat([state, forcing[:, None]], dim=1) - self.input_mean) / self.input_std
@@ -113,7 +115,6 @@ class StateStepper(nn.Module):
             nxt = torch.where(self.fixed_mask, self.fixed_values, nxt)
         return nxt
 
-
     def noise(self, x: torch.Tensor) -> torch.Tensor:
         """Fresh standard-normal channels; with ``stochastic_scale`` > 1 drawn on a coarser grid and bilinearly upsampled."""
 
@@ -122,6 +123,10 @@ class StateStepper(nn.Module):
             return torch.randn(x.shape[0], self.stochastic_channels, ny, nx, device=x.device, dtype=x.dtype)
         coarse = torch.randn(x.shape[0], self.stochastic_channels, -(-ny // self.stochastic_scale), -(-nx // self.stochastic_scale), device=x.device, dtype=x.dtype)
         return F.interpolate(coarse, size=(ny, nx), mode="bilinear", align_corners=False)
+
+    def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
+        state_dict.pop(prefix + "smoothing_kernel", None)
+        super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
 
     def smooth(self, field: torch.Tensor) -> torch.Tensor:
         """Separable Gaussian smoothing over wet cells only (normalised convolution).
