@@ -18,6 +18,7 @@ from src.config import ExperimentConfig, load_config
 from src.data_state import RolloutWindowDataset, dgsw2l_pair_split, fit_channel_normalisation, fit_increment_normalisation, load_two_layer_state_arrays
 from src.evaluation import N_LAYERS, STATE_CHANNELS, evaluate_rollout
 from src.models.baseline_cnn import StateCNN
+from src.models.latent import LatentEmulator, LatentModel
 from src.models.stepper import StateStepper, StepperEmulator
 from src.models.unet import StateUNet
 from src.results import append_result
@@ -112,6 +113,31 @@ def static_context(static_fields: list[str], state: np.ndarray, train_indices: n
     return np.concatenate(channels).astype("float32") if channels else None
 
 
+def build_latent_model(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarray, train_indices: np.ndarray, static_fields: list[str] | None = None) -> LatentModel:
+    """Latent reduced-order model with the same normalisation, static inputs and land handling as the stepper."""
+
+    norm = fit_channel_normalisation(inputs, state, train_indices)
+    n_state = state.shape[1]
+    _, increment_std = fit_increment_normalisation(state, train_indices)
+    static = static_context(static_fields or [], state, train_indices, norm.input_mean, norm.input_std)
+    fixed_mask, fixed_values = fixed_cell_mask(state, train_indices) if model_cfg.get("fixed_land_cells", False) else (None, None)
+    return LatentModel(
+        norm.input_mean[:n_state],
+        norm.input_std[:n_state],
+        float(norm.input_mean[n_state]),
+        float(norm.input_std[n_state]),
+        increment_std,
+        static=static,
+        fixed_mask=fixed_mask,
+        fixed_values=fixed_values,
+        latent_channels=int(model_cfg.get("latent_channels", 32)),
+        hidden_channels=int(model_cfg.get("hidden_channels", 32)),
+        levels=int(model_cfg.get("latent_levels", 3)),
+        stepper_channels=int(model_cfg.get("stepper_channels", 64)),
+        stepper_depth=int(model_cfg.get("stepper_depth", 2)),
+    )
+
+
 def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarray, train_indices: np.ndarray, static_fields: list[str] | None = None) -> StateStepper:
     """Wrap the configured network in a physical-units stepper with the configured target."""
 
@@ -194,7 +220,7 @@ def unrolled_crps_loss(stepper: StateStepper, states: torch.Tensor, winds: torch
 
 
 def train_one_epoch(
-    stepper: StateStepper,
+    stepper: StateStepper | LatentModel,
     loader: DataLoader,
     optimiser: torch.optim.Optimizer,
     device: torch.device,
@@ -209,7 +235,10 @@ def train_one_epoch(
         states = states.to(device)
         winds = winds.to(device)
         optimiser.zero_grad(set_to_none=True)
-        loss = (unrolled_crps_loss if loss_name == "crps" else unrolled_loss)(stepper, states, winds, noise_std)
+        if isinstance(stepper, LatentModel):
+            loss = stepper.window_loss(states, winds, noise_std)
+        else:
+            loss = (unrolled_crps_loss if loss_name == "crps" else unrolled_loss)(stepper, states, winds, noise_std)
         loss.backward()
         if gradient_clip_norm is not None:
             torch.nn.utils.clip_grad_norm_(stepper.parameters(), gradient_clip_norm)
@@ -300,7 +329,9 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     loader = DataLoader(dataset, batch_size=config.batch_size, shuffle=True)
     model_cfg = config.raw.get("model", {})
     static_fields = [str(name) for name in config.raw.get("inputs", {}).get("static_fields", [])]
-    stepper = build_stepper(model_cfg, inputs, state, train_indices, static_fields).to(device)
+    latent = str(model_cfg.get("type", "state_cnn")) == "latent"
+    builder = build_latent_model if latent else build_stepper
+    stepper = builder(model_cfg, inputs, state, train_indices, static_fields).to(device)
     optimiser = torch.optim.Adam(stepper.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
     epochs = config.smoke_test_epochs if smoke_test else config.epochs
     rollout_steps = 3 if smoke_test else config.rollout_steps
@@ -343,7 +374,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     # moving average of the weights instead of the latest optimiser iterate.
     ema = None if ema_decay is None else AveragedModel(stepper, multi_avg_fn=get_ema_multi_avg_fn(float(ema_decay)))
     eval_stepper = stepper if ema is None else ema.module
-    emulator = StepperEmulator(eval_stepper, device)
+    emulator = LatentEmulator(eval_stepper, device) if latent else StepperEmulator(eval_stepper, device)
     for epoch in range(1, epochs + 1):
         started = time.perf_counter()
         loss = train_one_epoch(stepper, loader, optimiser, device, gradient_clip_norm=config.gradient_clip_norm, noise_std=noise_std, ema=ema, loss_name=loss_name)
