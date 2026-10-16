@@ -299,11 +299,11 @@ def test_crps_loss_reduces_to_mae_for_identical_members_and_rewards_spread():
 
 def test_run_experiment_crps_with_stochastic_channels(tmp_path):
     config = write_config(tmp_path)
-    config.raw["model"].update({"target_mode": "residual", "stochastic_channels": 2})
+    config.raw["model"].update({"target_mode": "residual", "stochastic_channels": 2, "increment_smoothing": 0.5})
     config.raw["training"].update({"loss": "crps", "unroll_steps": 2})
     run_experiment(config, smoke_test=True)
     meta = json.loads(config.experiment_log.read_text())["metadata"]
-    assert meta["training_loss"] == "crps" and meta["stochastic_channels"] == 2
+    assert meta["training_loss"] == "crps" and meta["stochastic_channels"] == 2 and meta["increment_smoothing"] == 0.5
     config.raw["training"]["loss"] = "bogus"
     with pytest.raises(ValueError):
         run_experiment(config, smoke_test=True)

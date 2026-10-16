@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from torch import nn
 
 from src.evaluation import N_LAYERS
@@ -27,6 +28,9 @@ class StateStepper(nn.Module):
     projected out (over wet cells when a fixed mask is given), so each layer's volume is conserved exactly (as in the
     source model).
 
+    ``increment_smoothing`` (Gaussian sigma in cells, 0 = off) smooths the
+    increment over wet cells before the volume projection.
+
     ``stochastic_channels`` > 0 appends that many channels of fresh standard
     normal noise to the network input at every step, making the stepper a
     stochastic (ensemble-member) emulator; train it with an ensemble loss.
@@ -45,6 +49,7 @@ class StateStepper(nn.Module):
         fixed_mask: np.ndarray | None = None,
         fixed_values: np.ndarray | None = None,
         stochastic_channels: int = 0,
+        increment_smoothing: float = 0.0,
     ):
         super().__init__()
         if target_mode not in {"next_state", "residual"}:
@@ -65,6 +70,12 @@ class StateStepper(nn.Module):
         values = torch.zeros(0) if fixed_values is None else torch.as_tensor(fixed_values, dtype=torch.float32)[None]
         self.register_buffer("fixed_mask", mask)
         self.register_buffer("fixed_values", values)
+        if increment_smoothing < 0:
+            raise ValueError("increment_smoothing must be non-negative")
+        radius = int(np.ceil(3 * increment_smoothing))
+        offsets = torch.arange(-radius, radius + 1, dtype=torch.float32)
+        kernel = torch.exp(-0.5 * (offsets / increment_smoothing) ** 2) if increment_smoothing > 0 else torch.ones(1)
+        self.register_buffer("smoothing_kernel", kernel / kernel.sum())
 
     def forward(self, state: torch.Tensor, forcing: torch.Tensor) -> torch.Tensor:
         x = (torch.cat([state, forcing[:, None]], dim=1) - self.input_mean) / self.input_std
@@ -80,6 +91,8 @@ class StateStepper(nn.Module):
         has_fixed = bool(self.fixed_mask.numel())
         if has_fixed:
             delta = delta.masked_fill(self.fixed_mask, 0.0)
+        if self.smoothing_kernel.numel() > 1:
+            delta = self.smooth(delta)
         if self.mass_conserving:
             h_delta = delta[:, :N_LAYERS]
             if has_fixed:
@@ -92,6 +105,28 @@ class StateStepper(nn.Module):
         if has_fixed:
             nxt = torch.where(self.fixed_mask, self.fixed_values, nxt)
         return nxt
+
+
+    def smooth(self, field: torch.Tensor) -> torch.Tensor:
+        """Separable Gaussian smoothing over wet cells only (normalised convolution).
+
+        Acts like a fixed scale-selective dissipation on the increment, damping
+        grid-scale noise that the source model's viscosity never produces.
+        Land cells contribute nothing and stay zero.
+        """
+
+        wet = torch.ones_like(field[:, :1]) if not self.fixed_mask.numel() else (~self.fixed_mask).to(field.dtype).expand(field.shape[0], 1, -1, -1)
+        pad = (self.smoothing_kernel.numel() - 1) // 2
+        kx = self.smoothing_kernel.view(1, 1, 1, -1)
+        ky = self.smoothing_kernel.view(1, 1, -1, 1)
+
+        def blur(x: torch.Tensor) -> torch.Tensor:
+            n = x.shape[1]
+            x = F.conv2d(F.pad(x, (pad, pad, 0, 0)), kx.expand(n, 1, 1, -1), groups=n)
+            return F.conv2d(F.pad(x, (0, 0, pad, pad)), ky.expand(n, 1, -1, 1), groups=n)
+
+        smoothed = blur(field * wet) / blur(wet).clamp_min(1e-6)
+        return smoothed * wet
 
 
 class StepperEmulator:
