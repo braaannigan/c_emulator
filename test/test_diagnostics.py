@@ -147,3 +147,13 @@ def test_extended_forcing_continues_the_record_exactly():
     np.testing.assert_allclose(times, np.arange(8) * 7.0)
     assert forcing.shape == (8, 4, 3)
     np.testing.assert_allclose(forcing[:5], analytic_surface_wind_stress(ds))
+
+
+def test_relative_vorticity_of_solid_body_rotation_is_twice_the_rate():
+    from src.diagnostics import relative_vorticity
+
+    y, x = np.meshgrid(np.arange(10.0), np.arange(12.0), indexing="ij")
+    omega = 0.5
+    u, v = -omega * y, omega * x  # counter-clockwise rotation
+    np.testing.assert_allclose(relative_vorticity(u, v, 1.0), 2 * omega)
+    np.testing.assert_allclose(relative_vorticity(u, v, 2.0), omega)
