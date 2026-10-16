@@ -1,0 +1,71 @@
+experiment:
+  id: 20261017T110000-dgsw2l-crps-smooth06
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: crps-smooth06
+  kind: tuning
+  rationale: 'Increment smoothing at sigma 1 cut the grid-scale noise floor 20x but slightly
+    lowered eddy-band spectra (L0 0.94 -> 0.83) and seed 42''s epochs 30-60 average (163.9
+    vs 144.0; seed 7 level). A gentler filter (sigma 0.6: transfer 0.93 at 0.1, 0.75 at 0.2,
+    0.52 at 0.3, 0.17 at 0.5 cycles/cell) keeps more resolved eddy-scale change while still
+    damping the grid scale. Run locally on the Mac GPU in parallel with the RunPod seed-123
+    job.'
+  hypothesis: Sigma 0.6 keeps the eddy-band spectrum ratio >= 0.9 and the seed-42 epochs 30-60
+    average within ~6 of the incumbent's 144.0, while still cutting the small-scale noise
+    floor by >= 5x vs the incumbent.
+  conclusion: null
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261017T110000-dgsw2l-crps-smooth06.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+  ema_decay: 0.998
+  loss: crps
+model:
+  type: unet
+  hidden_channels: 32
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+  depth: 3
+  stochastic_channels: 4
+  increment_smoothing: 0.6
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '
