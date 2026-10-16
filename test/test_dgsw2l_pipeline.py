@@ -15,6 +15,7 @@ from src.pipelines.dgsw2l_baseline import (
     fixed_cell_mask,
     static_context,
     unrolled_loss,
+    unrolled_crps_loss,
     current_learning_rate,
     decay_learning_rate,
     resolve_device,
@@ -276,3 +277,49 @@ def test_run_experiment_with_ema_evaluates_and_saves_averaged_weights(tmp_path, 
         torch.testing.assert_close(saved[name], value)
     assert not isinstance(seen["stepper"], torch.optim.swa_utils.AveragedModel)
     assert seen["stepper"] is not None
+
+
+def test_crps_loss_reduces_to_mae_for_identical_members_and_rewards_spread():
+    class Zero(torch.nn.Module):
+        def forward(self, x):
+            return torch.zeros_like(x[:, :6])
+
+    from src.models.stepper import StateStepper
+
+    stepper = StateStepper(Zero(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual")
+    states = torch.zeros(1, 3, 6, 2, 2)
+    states[:, 2] = 2.0
+    winds = torch.zeros(1, 2, 2, 2)
+    # Members are identical (no stochastic input), so CRPS = MAE: errors 0 then 2 -> mean 1.
+    assert float(unrolled_crps_loss(stepper, states, winds)) == pytest.approx(1.0)
+    torch.manual_seed(0)
+    noisy = unrolled_crps_loss(stepper, states, winds, noise_std=1.0)
+    assert torch.isfinite(noisy)
+
+
+def test_run_experiment_crps_with_stochastic_channels(tmp_path):
+    config = write_config(tmp_path)
+    config.raw["model"].update({"target_mode": "residual", "stochastic_channels": 2})
+    config.raw["training"].update({"loss": "crps", "unroll_steps": 2})
+    run_experiment(config, smoke_test=True)
+    meta = json.loads(config.experiment_log.read_text())["metadata"]
+    assert meta["training_loss"] == "crps" and meta["stochastic_channels"] == 2
+    config.raw["training"]["loss"] = "bogus"
+    with pytest.raises(ValueError):
+        run_experiment(config, smoke_test=True)
+
+
+def test_crps_start_noise_spares_fixed_land_cells():
+    class Zero(torch.nn.Module):
+        def forward(self, x):
+            return torch.zeros_like(x[:, :6])
+
+    from src.models.stepper import StateStepper
+
+    mask = np.zeros((2, 2), dtype=bool)
+    mask[0] = True
+    stepper = StateStepper(Zero(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual", fixed_mask=mask, fixed_values=np.zeros((6, 2, 2), dtype="float32"))
+    torch.manual_seed(0)
+    states = torch.zeros(1, 2, 6, 2, 2)
+    loss = unrolled_crps_loss(stepper, states, torch.zeros(1, 1, 2, 2), noise_std=1.0)
+    assert float(loss) > 0.0

@@ -26,6 +26,10 @@ class StateStepper(nn.Module):
     With ``mass_conserving`` the per-layer domain-mean thickness change is
     projected out (over wet cells when a fixed mask is given), so each layer's volume is conserved exactly (as in the
     source model).
+
+    ``stochastic_channels`` > 0 appends that many channels of fresh standard
+    normal noise to the network input at every step, making the stepper a
+    stochastic (ensemble-member) emulator; train it with an ensemble loss.
     """
 
     def __init__(
@@ -40,11 +44,13 @@ class StateStepper(nn.Module):
         static: np.ndarray | None = None,
         fixed_mask: np.ndarray | None = None,
         fixed_values: np.ndarray | None = None,
+        stochastic_channels: int = 0,
     ):
         super().__init__()
         if target_mode not in {"next_state", "residual"}:
             raise ValueError(f"unknown target_mode {target_mode!r}")
         self.net = net
+        self.stochastic_channels = int(stochastic_channels)
         self.target_mode = target_mode
         self.mass_conserving = mass_conserving
         self.register_buffer("input_mean", torch.as_tensor(input_mean, dtype=torch.float32)[None, :, None, None])
@@ -64,6 +70,8 @@ class StateStepper(nn.Module):
         x = (torch.cat([state, forcing[:, None]], dim=1) - self.input_mean) / self.input_std
         if self.static.numel():
             x = torch.cat([x, self.static.expand(x.shape[0], -1, -1, -1)], dim=1)
+        if self.stochastic_channels:
+            x = torch.cat([x, torch.randn(x.shape[0], self.stochastic_channels, *x.shape[2:], device=x.device, dtype=x.dtype)], dim=1)
         out = self.net(x) * self.output_std + self.output_mean
         if self.target_mode == "residual":
             delta = out

@@ -74,3 +74,20 @@ def test_fixed_cells_without_mass_projection_and_argument_pairing():
     assert float(out[0, 0, 0, 0]) == 5.0 and float(out[0, 0, 1, 1]) == 1.0
     with pytest.raises(ValueError):
         StateStepper(AddOne(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), fixed_mask=mask)
+
+
+class FirstExtraChannel(torch.nn.Module):
+    """Residual net returning the last input channel (the stochastic one) for all outputs."""
+
+    def forward(self, x):
+        return x[:, -1:].expand(-1, 6, -1, -1)
+
+
+def test_stochastic_channels_make_each_call_a_fresh_member():
+    torch.manual_seed(0)
+    stepper = StateStepper(FirstExtraChannel(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual", stochastic_channels=1)
+    state, wind = torch.zeros(1, 6, 3, 3), torch.zeros(1, 3, 3)
+    first, second = stepper(state, wind), stepper(state, wind)
+    assert not torch.allclose(first, second)
+    deterministic = StateStepper(FirstExtraChannel(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual")
+    torch.testing.assert_close(deterministic(state, wind), deterministic(state, wind))
