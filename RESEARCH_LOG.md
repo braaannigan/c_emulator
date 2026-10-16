@@ -338,3 +338,63 @@ persistence). Track both MSE and variance/KE diagnostics.
 - Hypothesis: See 20261016T120000-dgsw2l-unet-ema-hweight-mild.
 - Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 222.1 / 288.4 / 0.006217 (std 0.90, KE 1.05); 10: 170.8 / 241.7 / 0.00336 (std 0.89, KE 0.45); 15: 164.8 / 254 / 0.002857 (std 0.90, KE 0.37); 20: 174 / 258.4 / 0.002435 (std 0.95, KE 0.53); 25: 191.9 / 279.2 / 0.002358 (std 0.98, KE 0.71); 30: 137.1 / 299.7 / 0.001727 (std 0.98, KE 0.78); 35: 120.7 / 180.1 / 0.001613 (std 0.98, KE 0.84); 40: 134.4 / 397.3 / 0.001893 (std 0.98, KE 0.88); 45: 147.4 / 419.3 / 0.00216 (std 0.98, KE 0.90); 50: 154.3 / 437.2 / 0.002315 (std 0.98, KE 0.91); 55: 157.4 / 427.8 / 0.002454 (std 0.98, KE 0.93); 60: 142.6 / 409.8 / 0.002344 (std 0.98, KE 0.94)
 - Conclusion: Seed replica; see 20261016T120000-dgsw2l-unet-ema-hweight.
+
+### 20261016T130000-dgsw2l-unet-ema-batch-b4 — tuning
+- Hypothesis: Changing the batch size (with a matched learning rate) around the EMA incumbent lowers the 3-seed epochs 30-60 average below 151.5 and the 3-seed final below 147.0 by more than ~10, with KE and h-std ratios above 0.9.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 265.4 / 383.5 / 0.004742 (std 0.92, KE 0.79); 10: 191.6 / 268.6 / 0.002811 (std 0.91, KE 0.43); 15: 187.7 / 337.5 / 0.002524 (std 0.97, KE 0.45); 20: 193.4 / 322.9 / 0.002274 (std 1.02, KE 0.64); 25: 187.7 / 289.6 / 0.002232 (std 1.02, KE 0.76); 30: 151.2 / 335.5 / 0.001799 (std 1.03, KE 0.83); 35: 156.8 / 346.4 / 0.002351 (std 1.01, KE 0.88); 40: 156.5 / 433.6 / 0.00247 (std 0.99, KE 0.90); 45: 163.9 / 464.6 / 0.002587 (std 0.99, KE 0.92); 50: 162.2 / 473.6 / 0.002541 (std 0.99, KE 0.93); 55: 155.9 / 497.5 / 0.002498 (std 0.99, KE 0.93); 60: 141.4 / 405 / 0.002195 (std 0.99, KE 0.94)
+- Conclusion: Neutral, not adopted (6-vs-6 seeds). Batch 4 (LR 3e-4, EMA 0.999) over seeds 42/7/123/11/19/23: final mean 157.6 (se 4.4), epochs 30-60 mean 149.4 (se 4.6). Unchanged incumbent (batch 8) over the same six seeds: final 146.4 (se 7.3), epochs 30-60 149.6 (se 2.8). Identical within noise; the 3-seed hint (144.9) was seed luck. Six-seed incumbent reference for future comparisons: epochs 30-60 149.6 +/- 2.8, final 146.4 +/- 7.3. Error decomposition of the EMA incumbent's rollout: MSE 158.5 = bias^2 6.6 + var_truth 125.2 + var_model 107.0 - 2cov 80.3 (tail beyond step 50: bias^2 9.5, 2cov only 32.5). The model's climate bias is already below climatology's (11.6), so the remaining error is the loss of covariance with the truth in the chaotic tail.
+
+### 20261016T130000-dgsw2l-unet-ema-batch-b16 — tuning
+- Hypothesis: Changing the batch size (with a matched learning rate) around the EMA incumbent lowers the 3-seed epochs 30-60 average below 151.5 and the 3-seed final below 147.0 by more than ~10, with KE and h-std ratios above 0.9.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 264.7 / 381.5 / 0.004133 (std 0.92, KE 0.69); 10: 198.3 / 279.4 / 0.002739 (std 0.90, KE 0.47); 15: 177.1 / 275.2 / 0.002587 (std 0.92, KE 0.45); 20: 179.1 / 322.9 / 0.002345 (std 0.98, KE 0.56); 25: 191.2 / 304.2 / 0.002309 (std 1.00, KE 0.72); 30: 156.6 / 321.6 / 0.002061 (std 0.99, KE 0.82); 35: 147 / 301.8 / 0.001779 (std 0.98, KE 0.88); 40: 158.2 / 407.6 / 0.002043 (std 0.98, KE 0.90); 45: 167.5 / 404.3 / 0.002337 (std 0.98, KE 0.92); 50: 159.9 / 343.5 / 0.002466 (std 0.99, KE 0.93); 55: 180.3 / 371.8 / 0.002801 (std 0.99, KE 0.93); 60: 182.8 / 392.4 / 0.002809 (std 0.99, KE 0.93)
+- Conclusion: Rejected. Batch 16 (LR 5e-4, EMA 0.996): 3-seed finals 182.8 / 166.9 / 162.7 (mean 170.8) and epochs 30-60 averages 164.6 / 150.1 / 161.1 (mean 158.6) vs the incumbent's 146.4 / 149.6 (6-seed). Fewer, smoother updates generalise slightly worse.
+
+### 20261016T130000-dgsw2l-unet-ema-batch-b4-seed7 — tuning
+- Hypothesis: See 20261016T130000-dgsw2l-unet-ema-batch-b4.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 239.2 / 355.9 / 0.005315 (std 0.93, KE 0.97); 10: 182.3 / 268.8 / 0.002832 (std 0.88, KE 0.41); 15: 170 / 262.8 / 0.002601 (std 0.88, KE 0.35); 20: 165.4 / 292 / 0.00233 (std 0.93, KE 0.49); 25: 163.5 / 283.4 / 0.002105 (std 0.97, KE 0.71); 30: 123.6 / 260.3 / 0.001457 (std 0.99, KE 0.81); 35: 144.6 / 301.3 / 0.001728 (std 0.98, KE 0.87); 40: 135.6 / 218.4 / 0.001833 (std 0.99, KE 0.89); 45: 157.7 / 349.6 / 0.002086 (std 0.99, KE 0.91); 50: 158.3 / 325.8 / 0.002116 (std 0.99, KE 0.93); 55: 168.5 / 390.9 / 0.002479 (std 0.99, KE 0.94); 60: 170.1 / 393.5 / 0.002391 (std 0.98, KE 0.94)
+- Conclusion: Seed replica; see 20261016T130000-dgsw2l-unet-ema-batch-b4.
+
+### 20261016T130000-dgsw2l-unet-ema-batch-b4-seed123 — tuning
+- Hypothesis: See 20261016T130000-dgsw2l-unet-ema-batch-b4.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 242.5 / 313.4 / 0.0047 (std 0.88, KE 0.73); 10: 200 / 246.6 / 0.002905 (std 0.82, KE 0.37); 15: 171.5 / 244.2 / 0.002518 (std 0.87, KE 0.39); 20: 173.9 / 221.7 / 0.002212 (std 0.94, KE 0.60); 25: 182.5 / 230.8 / 0.002268 (std 0.97, KE 0.74); 30: 121.4 / 216.1 / 0.001441 (std 0.98, KE 0.84); 35: 117.1 / 261.5 / 0.00163 (std 0.98, KE 0.89); 40: 126.9 / 334.3 / 0.001824 (std 0.98, KE 0.91); 45: 124.4 / 266.6 / 0.001927 (std 0.98, KE 0.93); 50: 121.7 / 265.7 / 0.001979 (std 0.99, KE 0.94); 55: 128.8 / 307.1 / 0.002042 (std 0.99, KE 0.94); 60: 157.2 / 418.9 / 0.00243 (std 0.99, KE 0.94)
+- Conclusion: Seed replica; see 20261016T130000-dgsw2l-unet-ema-batch-b4.
+
+### 20261016T130000-dgsw2l-unet-ema-batch-b16-seed7 — tuning
+- Hypothesis: See 20261016T130000-dgsw2l-unet-ema-batch-b16.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 239.7 / 358.4 / 0.004428 (std 0.92, KE 0.86); 10: 178.6 / 303.1 / 0.002759 (std 0.94, KE 0.51); 15: 163.3 / 300.2 / 0.002503 (std 0.97, KE 0.43); 20: 163.8 / 303.5 / 0.002417 (std 0.97, KE 0.48); 25: 170.4 / 308.2 / 0.002236 (std 0.98, KE 0.65); 30: 138.5 / 322.1 / 0.001761 (std 0.99, KE 0.77); 35: 138.1 / 259.4 / 0.001676 (std 0.99, KE 0.85); 40: 143.9 / 272.2 / 0.001749 (std 0.99, KE 0.90); 45: 152 / 220.5 / 0.001835 (std 0.99, KE 0.92); 50: 151.2 / 178.6 / 0.001876 (std 0.98, KE 0.94); 55: 160.2 / 273.7 / 0.002064 (std 0.98, KE 0.95); 60: 166.9 / 356.2 / 0.002213 (std 0.97, KE 0.95)
+- Conclusion: Seed replica; see 20261016T130000-dgsw2l-unet-ema-batch-b16.
+
+### 20261016T130000-dgsw2l-unet-ema-batch-b16-seed123 — tuning
+- Hypothesis: See 20261016T130000-dgsw2l-unet-ema-batch-b16.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 235.5 / 313.7 / 0.004153 (std 0.90, KE 0.66); 10: 172.1 / 236.4 / 0.002844 (std 0.90, KE 0.39); 15: 158.6 / 245.1 / 0.002636 (std 0.93, KE 0.37); 20: 172.7 / 237.5 / 0.002383 (std 0.95, KE 0.51); 25: 189.8 / 274.5 / 0.002382 (std 0.96, KE 0.66); 30: 163.4 / 252 / 0.002041 (std 0.97, KE 0.79); 35: 142.8 / 238.1 / 0.002054 (std 0.98, KE 0.86); 40: 169.7 / 377 / 0.002633 (std 0.98, KE 0.90); 45: 172.5 / 445.4 / 0.002764 (std 0.99, KE 0.92); 50: 161.4 / 410.5 / 0.002706 (std 0.98, KE 0.91); 55: 155.2 / 428 / 0.002621 (std 0.98, KE 0.93); 60: 162.7 / 434.7 / 0.002751 (std 0.98, KE 0.92)
+- Conclusion: Seed replica; see 20261016T130000-dgsw2l-unet-ema-batch-b16.
+
+### 20261016T130000-dgsw2l-unet-ema-batch-b4-seed11 — tuning
+- Hypothesis: See 20261016T130000-dgsw2l-unet-ema-batch-b4.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 259.3 / 368.2 / 0.005515 (std 0.92, KE 0.94); 10: 205.9 / 275.1 / 0.002736 (std 0.84, KE 0.41); 15: 168.6 / 255.7 / 0.002556 (std 0.91, KE 0.38); 20: 164.3 / 258.7 / 0.002165 (std 0.96, KE 0.56); 25: 179.9 / 266.4 / 0.002111 (std 0.99, KE 0.75); 30: 151.2 / 258.4 / 0.001882 (std 1.00, KE 0.84); 35: 145.5 / 344.2 / 0.002054 (std 1.00, KE 0.89); 40: 166 / 464.6 / 0.002494 (std 0.99, KE 0.92); 45: 163.1 / 423.9 / 0.002595 (std 0.99, KE 0.93); 50: 163.5 / 417.1 / 0.002652 (std 0.99, KE 0.94); 55: 159.6 / 428.1 / 0.002494 (std 0.98, KE 0.94); 60: 158.3 / 431.1 / 0.002427 (std 0.98, KE 0.95)
+- Conclusion: Extra seed; see 20261016T130000-dgsw2l-unet-ema-batch-b4.
+
+### 20261016T130000-dgsw2l-unet-ema-batch-ref-seed11 — tuning
+- Hypothesis: See 20261016T130000-dgsw2l-unet-ema-batch-b4.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 257.8 / 367.3 / 0.005929 (std 0.93, KE 1.01); 10: 223.2 / 300.4 / 0.003006 (std 0.84, KE 0.45); 15: 213.6 / 305.9 / 0.002713 (std 0.83, KE 0.35); 20: 185.5 / 288.2 / 0.002301 (std 0.91, KE 0.48); 25: 186.3 / 277.4 / 0.002212 (std 0.96, KE 0.68); 30: 158.8 / 276.5 / 0.001933 (std 0.98, KE 0.79); 35: 135.3 / 297.1 / 0.001769 (std 0.98, KE 0.87); 40: 154.2 / 463 / 0.002042 (std 0.98, KE 0.90); 45: 163.5 / 462.5 / 0.00228 (std 0.97, KE 0.92); 50: 168.1 / 464.9 / 0.002409 (std 0.97, KE 0.94); 55: 166.5 / 474.2 / 0.002464 (std 0.97, KE 0.95); 60: 163.2 / 447.6 / 0.002459 (std 0.97, KE 0.95)
+- Conclusion: Extra incumbent seed; see 20261016T130000-dgsw2l-unet-ema-batch-b4.
+
+### 20261016T130000-dgsw2l-unet-ema-batch-b4-seed19 — tuning
+- Hypothesis: See 20261016T130000-dgsw2l-unet-ema-batch-b4.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 257.5 / 384.4 / 0.01955 (std 0.93, KE 3.67); 10: 195.3 / 282.9 / 0.004665 (std 0.89, KE 0.81); 15: 188.6 / 316.5 / 0.002592 (std 0.91, KE 0.46); 20: 163 / 263.4 / 0.00215 (std 0.95, KE 0.61); 25: 168.7 / 242 / 0.002063 (std 0.98, KE 0.74); 30: 127.2 / 252.4 / 0.001538 (std 0.98, KE 0.82); 35: 148.3 / 407.4 / 0.002059 (std 0.98, KE 0.90); 40: 162 / 451.2 / 0.002512 (std 0.98, KE 0.91); 45: 159.8 / 430.9 / 0.002507 (std 0.97, KE 0.93); 50: 166.2 / 446.1 / 0.002452 (std 0.98, KE 0.94); 55: 169 / 451.8 / 0.002425 (std 0.98, KE 0.94); 60: 168 / 449.5 / 0.002376 (std 0.98, KE 0.95)
+- Conclusion: Extra seed; see 20261016T130000-dgsw2l-unet-ema-batch-b4.
+
+### 20261016T130000-dgsw2l-unet-ema-batch-ref-seed19 — tuning
+- Hypothesis: See 20261016T130000-dgsw2l-unet-ema-batch-b4.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 261.6 / 397 / 0.01977 (std 0.94, KE 3.72); 10: 202.9 / 297.3 / 0.005358 (std 0.87, KE 1.05); 15: 194.2 / 286.3 / 0.00291 (std 0.85, KE 0.56); 20: 178 / 274 / 0.002394 (std 0.89, KE 0.58); 25: 170.2 / 241.2 / 0.002204 (std 0.93, KE 0.69); 30: 141.7 / 232.6 / 0.001678 (std 0.96, KE 0.79); 35: 126.8 / 253.4 / 0.001577 (std 0.97, KE 0.85); 40: 133.8 / 356.7 / 0.001736 (std 0.98, KE 0.89); 45: 134.2 / 370.6 / 0.001922 (std 0.98, KE 0.92); 50: 145.5 / 397.5 / 0.002092 (std 0.98, KE 0.94); 55: 151.1 / 385.9 / 0.002205 (std 0.98, KE 0.94); 60: 151.2 / 388.6 / 0.002262 (std 0.98, KE 0.94)
+- Conclusion: Extra incumbent seed; see 20261016T130000-dgsw2l-unet-ema-batch-b4.
+
+### 20261016T130000-dgsw2l-unet-ema-batch-b4-seed23 — tuning
+- Hypothesis: See 20261016T130000-dgsw2l-unet-ema-batch-b4.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 258.2 / 393.4 / 0.005869 (std 0.87, KE 1.06); 10: 222.4 / 324.6 / 0.002814 (std 0.82, KE 0.45); 15: 187 / 278.6 / 0.002421 (std 0.84, KE 0.42); 20: 157.8 / 248.9 / 0.002266 (std 0.91, KE 0.55); 25: 152.7 / 259.8 / 0.00228 (std 0.97, KE 0.74); 30: 129.9 / 221.3 / 0.001606 (std 0.97, KE 0.85); 35: 156.5 / 389.9 / 0.001923 (std 0.97, KE 0.89); 40: 134.7 / 355 / 0.00205 (std 0.98, KE 0.91); 45: 154 / 425.6 / 0.002312 (std 0.98, KE 0.93); 50: 149.9 / 338.9 / 0.002305 (std 0.98, KE 0.95); 55: 150.4 / 343.5 / 0.002334 (std 0.98, KE 0.95); 60: 150.3 / 358.6 / 0.00235 (std 0.98, KE 0.95)
+- Conclusion: Extra seed; see 20261016T130000-dgsw2l-unet-ema-batch-b4.
+
+### 20261016T130000-dgsw2l-unet-ema-batch-ref-seed23 — tuning
+- Hypothesis: See 20261016T130000-dgsw2l-unet-ema-batch-b4.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 268.5 / 420.3 / 0.006442 (std 0.87, KE 1.20); 10: 236.6 / 362.4 / 0.002954 (std 0.83, KE 0.50); 15: 194.8 / 318.6 / 0.002563 (std 0.86, KE 0.42); 20: 175.6 / 297.8 / 0.002289 (std 0.91, KE 0.51); 25: 167 / 275.2 / 0.002149 (std 0.95, KE 0.66); 30: 139.7 / 264.9 / 0.0019 (std 0.97, KE 0.77); 35: 138.2 / 338.2 / 0.001798 (std 0.97, KE 0.85); 40: 156.5 / 316.9 / 0.001957 (std 0.97, KE 0.89); 45: 166.4 / 319.8 / 0.002032 (std 0.98, KE 0.92); 50: 145.5 / 309.8 / 0.002001 (std 0.98, KE 0.93); 55: 136.7 / 226.5 / 0.002109 (std 0.98, KE 0.95); 60: 123.1 / 233.6 / 0.001916 (std 0.98, KE 0.94)
+- Conclusion: Extra incumbent seed; see 20261016T130000-dgsw2l-unet-ema-batch-b4.
