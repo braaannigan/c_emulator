@@ -118,6 +118,19 @@ def test_increment_smoothing_spreads_spikes_and_spares_land():
     assert float(out[0, 2, 4, 4]) < 0.5
 
 
+def test_coarse_stochastic_noise_is_smooth_and_validated():
+    with pytest.raises(ValueError):
+        StateStepper(FirstExtraChannel(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), stochastic_channels=1, stochastic_scale=0)
+    torch.manual_seed(0)
+    fine = StateStepper(FirstExtraChannel(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual", stochastic_channels=1)
+    coarse = StateStepper(FirstExtraChannel(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual", stochastic_channels=1, stochastic_scale=4)
+    state, wind = torch.zeros(1, 6, 30, 22), torch.zeros(1, 30, 22)
+    rough = lambda out: float((out[0, 0, :, 1:] - out[0, 0, :, :-1]).abs().mean())
+    a, b = fine(state, wind), coarse(state, wind)
+    assert b.shape == a.shape
+    assert rough(b) < 0.5 * rough(a)
+
+
 def test_checkpoints_load_with_or_without_the_smoothing_kernel():
     def build():
         return StateStepper(AddOne(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), increment_smoothing=1.0)

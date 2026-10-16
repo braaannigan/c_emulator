@@ -1,0 +1,83 @@
+experiment:
+  id: 20261017T120000-dgsw2l-crps-coarse-noise
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: crps-coarse-noise
+  kind: medium_step
+  rationale: The stochastic inputs of the CRPS model are white noise at every grid cell, the
+    likely source of its grid-scale noise floor; smoothing the increment treats the symptom.
+    Drawing the 4 noise channels on a 4x coarser grid (50x25) and upsampling bilinearly injects
+    randomness at the eddy scales where real uncertainty grows (40+ km), so the generator
+    has no grid-scale randomness to pass through. Changes the stochastic forcing representation
+    on top of the smoothed incumbent; single seed (42) on the cheap RunPod endpoint with remote
+    diagnostics.
+  hypothesis: Coarse-scale noise (scale 4) on the smoothed incumbent further lowers the small-scale
+    spectrum excess (held-out L0 below ~150 vs 337) and keeps the seed-42 epochs 30-60 eval_mse_mean
+    within ~6 of the incumbent family's 3-seed mean (151.5), with KE ratio >= 0.9.
+  conclusion: 'Strong candidate, not promoted (strict application of the promotion rule; flagged
+    for the user). Stochastic inputs drawn on a 4x coarser grid on top of the smoothed incumbent,
+    seeds 42/7/123 vs the incumbent''s same seeds: better on every scorecard measure - predictable-range
+    MSE 18.3 vs 18.8, realism 0.70 vs 0.99, grid-noise excess 0.94 vs 1.45 decades (held-out
+    L0 small-scale excess 71-87 vs 337), long-run drift 0.22 vs 0.29 (25-year KE ends inside
+    the truth''s range for seed 7), eddy-band spectrum ratio 0.93-0.96 vs 0.83 - and level
+    on epochs 30-60 eval_mse_mean (154 vs 152), but the final-checkpoint eval_mse_mean is
+    22 worse (165: 167.5 / 163.9 / 162.3, vs 143: 142.2 / 157.8 / 128.7), beyond the ~5-point
+    allowance. The incumbent''s final mean leans on one low seed (128.7), and the candidate''s
+    finals are unusually consistent, so the final-epoch gap may be partly luck; velocity MSE
+    is slightly worse (0.0021 vs 0.0019). Run time 1626-1735 s on the 16 GB tier.'
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261017T120000-dgsw2l-crps-coarse-noise.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+  ema_decay: 0.998
+  loss: crps
+model:
+  type: unet
+  hidden_channels: 32
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+  depth: 3
+  stochastic_channels: 4
+  increment_smoothing: 1.0
+  stochastic_scale: 4
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '

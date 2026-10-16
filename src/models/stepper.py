@@ -28,6 +28,9 @@ class StateStepper(nn.Module):
     projected out (over wet cells when a fixed mask is given), so each layer's volume is conserved exactly (as in the
     source model).
 
+    ``stochastic_scale`` > 1 draws the noise channels on a grid that many
+    times coarser and upsamples them, so randomness enters at larger scales.
+
     ``increment_smoothing`` (Gaussian sigma in cells, 0 = off) smooths the
     increment over wet cells before the volume projection.
 
@@ -50,12 +53,16 @@ class StateStepper(nn.Module):
         fixed_values: np.ndarray | None = None,
         stochastic_channels: int = 0,
         increment_smoothing: float = 0.0,
+        stochastic_scale: int = 1,
     ):
         super().__init__()
         if target_mode not in {"next_state", "residual"}:
             raise ValueError(f"unknown target_mode {target_mode!r}")
         self.net = net
         self.stochastic_channels = int(stochastic_channels)
+        if stochastic_scale < 1:
+            raise ValueError("stochastic_scale must be at least 1")
+        self.stochastic_scale = int(stochastic_scale)
         self.target_mode = target_mode
         self.mass_conserving = mass_conserving
         self.register_buffer("input_mean", torch.as_tensor(input_mean, dtype=torch.float32)[None, :, None, None])
@@ -84,7 +91,7 @@ class StateStepper(nn.Module):
         if self.static.numel():
             x = torch.cat([x, self.static.expand(x.shape[0], -1, -1, -1)], dim=1)
         if self.stochastic_channels:
-            x = torch.cat([x, torch.randn(x.shape[0], self.stochastic_channels, *x.shape[2:], device=x.device, dtype=x.dtype)], dim=1)
+            x = torch.cat([x, self.noise(x)], dim=1)
         out = self.net(x) * self.output_std + self.output_mean
         if self.target_mode == "residual":
             delta = out
@@ -108,6 +115,14 @@ class StateStepper(nn.Module):
             nxt = torch.where(self.fixed_mask, self.fixed_values, nxt)
         return nxt
 
+    def noise(self, x: torch.Tensor) -> torch.Tensor:
+        """Fresh standard-normal channels; with ``stochastic_scale`` > 1 drawn on a coarser grid and bilinearly upsampled."""
+
+        ny, nx = x.shape[-2:]
+        if self.stochastic_scale == 1:
+            return torch.randn(x.shape[0], self.stochastic_channels, ny, nx, device=x.device, dtype=x.dtype)
+        coarse = torch.randn(x.shape[0], self.stochastic_channels, -(-ny // self.stochastic_scale), -(-nx // self.stochastic_scale), device=x.device, dtype=x.dtype)
+        return F.interpolate(coarse, size=(ny, nx), mode="bilinear", align_corners=False)
 
     def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
         state_dict.pop(prefix + "smoothing_kernel", None)

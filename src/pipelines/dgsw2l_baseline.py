@@ -140,6 +140,7 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
         fixed_values=fixed_values,
         stochastic_channels=stochastic_channels,
         increment_smoothing=float(model_cfg.get("increment_smoothing", 0.0)),
+        stochastic_scale=int(model_cfg.get("stochastic_scale", 1)),
     )
 
 
@@ -330,6 +331,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
             "training_loss": loss_name,
             "stochastic_channels": stepper.stochastic_channels,
             "increment_smoothing": float(model_cfg.get("increment_smoothing", 0.0)),
+            "stochastic_scale": stepper.stochastic_scale,
             "static_fields": static_fields,
             "fixed_land_cells": bool(stepper.fixed_mask.numel()),
             "primary_metric": "layer-thickness MSE of fully autoregressive rollout (src/evaluation.py)",

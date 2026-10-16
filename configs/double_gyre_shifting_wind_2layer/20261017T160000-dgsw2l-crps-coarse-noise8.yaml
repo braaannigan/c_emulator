@@ -1,0 +1,78 @@
+experiment:
+  id: 20261017T160000-dgsw2l-crps-coarse-noise8
+  acronym: dgsw2l
+  family: double_gyre_shifting_wind_2layer
+  summary: crps-coarse-noise8
+  kind: tuning
+  rationale: Noise drawn 4x coarser gave the best realism yet (0.70 vs 0.99) at level epochs
+    30-60 MSE. Drawing it 8x coarser (25x13 grid, ~80 km) tests whether pushing the injected
+    randomness further toward the eddy/gyre scale continues the gain or starves the generator
+    of mesoscale spread. RunPod, seed 42, with diagnostics.
+  hypothesis: Noise at 8x coarser resolution keeps realism at or below 0.70 and raises the
+    final-checkpoint eval_mse_mean no further (seed 42 within ~10 of 167.5), with predictable-range
+    MSE within ~1 of 18.3.
+  conclusion: 'PROMOTED to incumbent by user decision (2026-10-16), overriding the strict
+    promotion rule on the user''s realism priority. Noise drawn 8x coarser with increment
+    smoothing, 4 matched seeds (42/7/123/11) vs the previous incumbent: realism 0.72 vs 0.99,
+    grid-noise excess 0.97 vs 1.45 decades, long-run drift 0.12 vs 0.29 (25-year KE inside
+    the truth range), predictable-range MSE 17.5 +/- 1.1 vs 17.8 +/- 1.1, epochs 30-60 eval_mse_mean
+    152.5 +/- 2.3 vs 148.0 +/- 5.8 (level), final 157.6 +/- 2.7 vs 143.1 +/- 5.9 (~10% worse
+    in the tail, mostly time-mean bias in the northern recirculation where the held-out years
+    depart from the training climate). Seed-42 rollout regenerated locally: 146.7 / 379.0
+    / 0.00216.'
+paths:
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261017T160000-dgsw2l-crps-coarse-noise8.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+runtime:
+  seed: 42
+  device: auto
+  epochs: 60
+  smoke_test_epochs: 1
+split:
+  method: chronological
+  train_fraction: 0.8
+  eval_fraction: 0.2
+inputs:
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  layers: 2
+  conditioning_fields:
+  - surface_wind_stress
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+training:
+  batch_size: 8
+  learning_rate: 0.0003
+  unroll_steps: 8
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+  ema_decay: 0.998
+  loss: crps
+model:
+  type: unet
+  hidden_channels: 32
+  target_mode: residual
+  loss: mse
+  mass_conserving: true
+  fixed_land_cells: true
+  depth: 3
+  stochastic_channels: 4
+  increment_smoothing: 1.0
+  stochastic_scale: 8
+rollout:
+  autoregressive: true
+  steps: null
+  eval_interval_epochs: 5
+  save_outputs: false
+metrics:
+  primary: eval_mse_mean
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '

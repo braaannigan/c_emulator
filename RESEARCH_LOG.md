@@ -2,43 +2,37 @@
 
 ## Current incumbent
 
-`20261017T090000-dgsw2l-crps-smooth-increment` (seeds 42, 7, 123 on RunPod:
-`-seed7`, `-seed123`).
+`20261017T160000-dgsw2l-crps-coarse-noise8` (seeds 42, 7, 123, 11:
+`-seed7`, `-seed123`, `-seed11`). Promoted by user decision on physical
+realism (2026-10-16).
 
-- Recipe: the stochastic CRPS U-Net below plus a fixed, land-aware Gaussian
-  smoothing (sigma 1 cell) of every step's increment before the volume
-  projection - a scale-selective dissipation analogous to the source model's
-  viscosity. Stochastic 3-level U-Net (32/64/128/256 ch) with 4 fresh noise
-  channels per step, two-member fair CRPS over 8-step unrolls, residual
-  target, exact per-layer volume conservation over wet cells, pinned land,
-  static inputs (train-mean state, coordinates, land mask), start-state noise
-  of 1 increment-std, EMA weights (0.998), Adam 3e-4, batch 8, clip 1.0, 60
-  epochs.
-- Three-seed scores vs the CRPS model's same seeds: epochs 30-60 151.5 vs
-  146.7, final 142.9 vs 154.3 (level within noise). Promoted on fidelity:
-  grid-scale noise floor ~20x lower, no KE drift over a 25-year free run
-  (ends inside the truth's yearly range), long-run KE ratio 1.02, EKE maps
-  correlation 0.97-0.99.
-- Seed-42 final rollout (regenerated locally): 135.5 / last 377.0 / vel
-  0.00199.
-- Full rollout: `data/double_gyre_shifting_wind_2layer/rollout/20261017T090000-dgsw2l-crps-smooth-increment-final-epoch0060.nc`;
-  checkpoint `data/double_gyre_shifting_wind_2layer/checkpoints/20261017T090000-dgsw2l-crps-smooth-increment.pt`;
-  diagnostics `data/double_gyre_shifting_wind_2layer/diagnostics/<id>/`;
-  animations `figs/<id>-{long,held-out}-layer0.mp4`.
+- Recipe: the smoothed CRPS U-Net with its 4 stochastic input channels drawn
+  on an 8x coarser grid (25x13) and bilinearly upsampled. Stochastic 3-level
+  U-Net (32/64/128/256 ch), two-member fair CRPS over 8-step unrolls, fixed
+  land-aware Gaussian increment smoothing (sigma 1 cell), residual target,
+  exact per-layer volume conservation over wet cells, pinned land, static
+  inputs (train-mean state, coordinates, land mask), start-state noise of 1
+  increment-std, EMA weights (0.998), Adam 3e-4, batch 8, clip 1.0, 60 epochs.
+- Four matched seeds vs the previous incumbent (smoothed CRPS): realism 0.72
+  vs 0.99, grid-noise excess 0.97 vs 1.45 decades, long-run drift 0.12 vs
+  0.29, predictable-range MSE 17.5 vs 17.8, epochs 30-60 eval_mse_mean 152.5
+  vs 148.0 (level), final 157.6 vs 143.1 (~10% worse tail MSE, mostly
+  time-mean bias in the northern recirculation).
+- Caveat: despite its noise inputs the model is effectively deterministic
+  (4-8 members have spread/error ~0.01); see the crps-shared-start
+  experiments for genuinely stochastic training.
+- Seed-42 final rollout (regenerated locally): 146.7 / last 379.0 / vel
+  0.00216.
+- Full rollout: `data/double_gyre_shifting_wind_2layer/rollout/20261017T160000-dgsw2l-crps-coarse-noise8-final-epoch0060.nc`;
+  checkpoint `data/double_gyre_shifting_wind_2layer/checkpoints/20261017T160000-dgsw2l-crps-coarse-noise8.pt`;
+  animations `figs/20261017T160000-dgsw2l-crps-coarse-noise8-{long,held-out}-layer0.mp4`.
 - Experiments: one job at a time on the cheap RunPod endpoint
-  (`scripts/runpod_run.py`, add `--diagnostics` for remote fidelity
-  reports) plus one local run on the Mac GPU.
+  (`scripts/runpod_run.py --diagnostics`) plus one local run on the Mac GPU;
+  compare with `scripts/scorecard_table.py`.
 
-- Scorecard baselines (seed-42 final checkpoints; held-out `predictable_mse`
-  over 26 steps, `realism`, grid-noise excess in decades, 25-year
-  `drift_score`; lower is better): deterministic EMA 20.9 / 0.91 / 1.8 /
-  0.004; CRPS 13.7 / 1.14 / 2.7 / 0.67; smoothed CRPS (incumbent) 14.4 / 0.99
-  / 1.5 / 0.29; sigma-0.6 smoothing - / 1.14 / 2.1 / 0.54. Three-seed
-  epochs 30-60 `predictable_mse` from logs: EMA 21.5, CRPS 17.4, smoothed
-  CRPS 18.8. The stochastic models buy short-range skill at some realism
-  cost (grid noise, and eddy-band power lost to smoothing: eddy-band ratio
-  0.83); the deterministic EMA model has the best spectra and no drift but
-  the weakest short-range skill.
+Previous incumbent (smoothed CRPS, per-cell noise):
+`20261017T090000-dgsw2l-crps-smooth-increment` - 4-seed final 143.1,
+epochs 30-60 148.0, realism 0.99, drift 0.29.
 
 Previous incumbent (CRPS without smoothing):
 `20261016T140000-dgsw2l-unet-ema-crps` - stochastic CRPS U-Net with EMA;
@@ -492,11 +486,6 @@ persistence). Track both MSE and variance/KE diagnostics.
 - Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 273 / 457.7 / 0.007632 (std 1.01, KE 1.40); 10: 227.1 / 449.4 / 0.003504 (std 1.05, KE 0.62); 15: 205 / 403.2 / 0.002872 (std 1.03, KE 0.53); 20: 214.3 / 402.9 / 0.002444 (std 1.05, KE 0.59); 25: 215.2 / 385.3 / 0.002299 (std 1.03, KE 0.72); 30: 186.6 / 432.9 / 0.002174 (std 1.01, KE 0.80); 35: 161.6 / 368.3 / 0.002126 (std 0.98, KE 0.86); 40: 165.4 / 378.9 / 0.002098 (std 0.97, KE 0.91); 45: 163.3 / 419.6 / 0.002297 (std 0.98, KE 0.93); 50: 165 / 362.8 / 0.002369 (std 0.97, KE 0.93); 55: 178 / 425 / 0.002291 (std 0.98, KE 0.96); 60: 169.9 / 424.4 / 0.002318 (std 0.98, KE 0.95)
 - Conclusion: Rejected. Start-state noise 0.5 with CRPS: 3-seed epochs 30-60 mean 159.6 (170.0 / 153.4 / 155.5), final 162.3, velocity MSE 0.0022, KE last 0.83 vs the CRPS incumbent's 145.4 / 151.1 / 0.00195 / 0.86. Start-state noise of 1.0 is still needed even with stochastic inputs.
 
-### 20261016T173000-dgsw2l-crps-unroll12 — medium_step
-- Hypothesis: Training the CRPS incumbent on 12-step unrolls lowers the 3-seed epochs 30-60 mean below ~140 (incumbent 145.4 +/- 1.3) and step-20 error below 15, keeping KE ratio at the last step at or above 0.86.
-- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 273 / 467 / 0.007303 (std 1.02, KE 1.41); 10: 222.7 / 435.5 / 0.003196 (std 1.05, KE 0.69); 15: 184.3 / 336.9 / 0.002547 (std 0.98, KE 0.53); 20: 184.1 / 303.1 / 0.002268 (std 1.00, KE 0.56); 25: 188.6 / 332.1 / 0.002195 (std 1.03, KE 0.71); 30: 170.4 / 288.9 / 0.001834 (std 1.02, KE 0.81); 35: 165.7 / 386.9 / 0.002347 (std 1.01, KE 0.86); 40: 151.8 / 355.2 / 0.001826 (std 1.00, KE 0.90); 45: 145.4 / 272 / 0.002099 (std 0.98, KE 0.92); 50: 162.9 / 455.2 / 0.002455 (std 0.97, KE 0.94); 55: 135.5 / 408.2 / 0.001995 (std 0.98, KE 0.95); 60: 148.7 / 434.2 / 0.00229 (std 0.97, KE 0.94)
-- Conclusion: Rejected. 12-step unrolls with CRPS: 3-seed epochs 30-60 154.4 / 157.8 / 151.5 (mean 154.6) and finals 148.7 / 171.5 / 166.2 (mean 162.1) vs the CRPS incumbent's 145.4 / 151.1, with lower KE at the last step (0.80-0.86) and 1.5x run time (10-20 min). Even without the blurring incentive of MSE, longer unrolls trade update count and short-lead fit for nothing at mid leads. Keep 8 steps.
-
 ### 20261016T160000-dgsw2l-crps-tuning-ch8-seed7 — tuning
 - Hypothesis: See 20261016T160000-dgsw2l-crps-tuning-ch8.
 - Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 249.3 / 320.1 / 0.004631 (std 0.92, KE 0.93); 10: 213 / 280.2 / 0.003048 (std 0.86, KE 0.57); 15: 206 / 304.9 / 0.002914 (std 0.86, KE 0.46); 20: 191.8 / 339.5 / 0.002502 (std 0.94, KE 0.60); 25: 197.6 / 286.7 / 0.00234 (std 0.98, KE 0.79); 30: 134 / 306.2 / 0.001603 (std 0.98, KE 0.86); 35: 126.7 / 243.1 / 0.001477 (std 0.97, KE 0.90); 40: 131 / 226.2 / 0.001597 (std 0.97, KE 0.91); 45: 160.3 / 405 / 0.002021 (std 0.97, KE 0.93); 50: 153.3 / 333 / 0.001851 (std 0.97, KE 0.93); 55: 159.3 / 431.2 / 0.002116 (std 0.97, KE 0.94); 60: 159.1 / 427.1 / 0.002136 (std 0.97, KE 0.95)
@@ -527,15 +516,20 @@ persistence). Track both MSE and variance/KE diagnostics.
 - Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 274.4 / 418.5 / 0.01442 (std 0.89, KE 2.63); 10: 240.6 / 379.5 / 0.004637 (std 0.86, KE 0.76); 15: 217.2 / 370.7 / 0.003002 (std 0.90, KE 0.47); 20: 224.9 / 375.9 / 0.00256 (std 1.00, KE 0.62); 25: 189.7 / 285.3 / 0.002156 (std 1.01, KE 0.77); 30: 138.1 / 337.1 / 0.001546 (std 1.00, KE 0.85); 35: 160.2 / 372.8 / 0.001974 (std 0.99, KE 0.90); 40: 171.4 / 479.1 / 0.002251 (std 0.98, KE 0.92); 45: 162.1 / 446.8 / 0.002301 (std 0.99, KE 0.94); 50: 144.8 / 374.2 / 0.002249 (std 0.98, KE 0.94); 55: 137.3 / 282.6 / 0.002175 (std 0.99, KE 0.95); 60: 159.7 / 235.1 / 0.002553 (std 0.98, KE 0.94)
 - Conclusion: Seed replica; see 20261016T160000-dgsw2l-crps-tuning-noise05.
 
-### 20261016T173000-dgsw2l-crps-unroll12-seed7 — tuning
-- Hypothesis: See 20261016T173000-dgsw2l-crps-unroll12.
-- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 262.1 / 389.2 / 0.01505 (std 0.90, KE 2.81); 10: 229.9 / 352.7 / 0.004381 (std 0.84, KE 0.85); 15: 203.6 / 318.4 / 0.002774 (std 0.88, KE 0.53); 20: 196.9 / 327.1 / 0.002451 (std 0.95, KE 0.55); 25: 212.3 / 276.6 / 0.002462 (std 1.00, KE 0.80); 30: 159.8 / 280.8 / 0.001999 (std 0.99, KE 0.84); 35: 144.1 / 254.4 / 0.00177 (std 0.98, KE 0.87); 40: 150.8 / 408.1 / 0.002037 (std 0.97, KE 0.91); 45: 154.8 / 449.5 / 0.002212 (std 0.97, KE 0.92); 50: 160.1 / 465.6 / 0.002352 (std 0.97, KE 0.93); 55: 163.5 / 477 / 0.002553 (std 0.97, KE 0.93); 60: 171.5 / 467.6 / 0.002679 (std 0.98, KE 0.94)
-- Conclusion: Seed replica; see 20261016T173000-dgsw2l-crps-unroll12.
-
 ### 20261016T160000-dgsw2l-crps-tuning-noise05-seed123 — tuning
 - Hypothesis: See 20261016T160000-dgsw2l-crps-tuning-noise05.
 - Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 283.3 / 426.9 / 0.00788 (std 0.90, KE 1.48); 10: 228.6 / 320.5 / 0.003156 (std 0.86, KE 0.60); 15: 196.5 / 297.2 / 0.002627 (std 0.89, KE 0.49); 20: 204.3 / 283.7 / 0.002492 (std 0.91, KE 0.57); 25: 208.8 / 315.6 / 0.002378 (std 0.96, KE 0.76); 30: 168.3 / 335.5 / 0.002013 (std 0.97, KE 0.84); 35: 147.7 / 327.4 / 0.00187 (std 0.99, KE 0.90); 40: 131.7 / 319.4 / 0.001797 (std 0.98, KE 0.92); 45: 145.6 / 273.9 / 0.002267 (std 0.99, KE 0.94); 50: 170 / 417.4 / 0.002712 (std 0.98, KE 0.94); 55: 168 / 441.3 / 0.00273 (std 0.98, KE 0.94); 60: 157.2 / 427.1 / 0.002359 (std 0.99, KE 0.95)
 - Conclusion: Seed replica; see 20261016T160000-dgsw2l-crps-tuning-noise05.
+
+### 20261016T173000-dgsw2l-crps-unroll12 — medium_step
+- Hypothesis: Training the CRPS incumbent on 12-step unrolls lowers the 3-seed epochs 30-60 mean below ~140 (incumbent 145.4 +/- 1.3) and step-20 error below 15, keeping KE ratio at the last step at or above 0.86.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 273 / 467 / 0.007303 (std 1.02, KE 1.41); 10: 222.7 / 435.5 / 0.003196 (std 1.05, KE 0.69); 15: 184.3 / 336.9 / 0.002547 (std 0.98, KE 0.53); 20: 184.1 / 303.1 / 0.002268 (std 1.00, KE 0.56); 25: 188.6 / 332.1 / 0.002195 (std 1.03, KE 0.71); 30: 170.4 / 288.9 / 0.001834 (std 1.02, KE 0.81); 35: 165.7 / 386.9 / 0.002347 (std 1.01, KE 0.86); 40: 151.8 / 355.2 / 0.001826 (std 1.00, KE 0.90); 45: 145.4 / 272 / 0.002099 (std 0.98, KE 0.92); 50: 162.9 / 455.2 / 0.002455 (std 0.97, KE 0.94); 55: 135.5 / 408.2 / 0.001995 (std 0.98, KE 0.95); 60: 148.7 / 434.2 / 0.00229 (std 0.97, KE 0.94)
+- Conclusion: Rejected. 12-step unrolls with CRPS: 3-seed epochs 30-60 154.4 / 157.8 / 151.5 (mean 154.6) and finals 148.7 / 171.5 / 166.2 (mean 162.1) vs the CRPS incumbent's 145.4 / 151.1, with lower KE at the last step (0.80-0.86) and 1.5x run time (10-20 min). Even without the blurring incentive of MSE, longer unrolls trade update count and short-lead fit for nothing at mid leads. Keep 8 steps.
+
+### 20261016T173000-dgsw2l-crps-unroll12-seed7 — tuning
+- Hypothesis: See 20261016T173000-dgsw2l-crps-unroll12.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 262.1 / 389.2 / 0.01505 (std 0.90, KE 2.81); 10: 229.9 / 352.7 / 0.004381 (std 0.84, KE 0.85); 15: 203.6 / 318.4 / 0.002774 (std 0.88, KE 0.53); 20: 196.9 / 327.1 / 0.002451 (std 0.95, KE 0.55); 25: 212.3 / 276.6 / 0.002462 (std 1.00, KE 0.80); 30: 159.8 / 280.8 / 0.001999 (std 0.99, KE 0.84); 35: 144.1 / 254.4 / 0.00177 (std 0.98, KE 0.87); 40: 150.8 / 408.1 / 0.002037 (std 0.97, KE 0.91); 45: 154.8 / 449.5 / 0.002212 (std 0.97, KE 0.92); 50: 160.1 / 465.6 / 0.002352 (std 0.97, KE 0.93); 55: 163.5 / 477 / 0.002553 (std 0.97, KE 0.93); 60: 171.5 / 467.6 / 0.002679 (std 0.98, KE 0.94)
+- Conclusion: Seed replica; see 20261016T173000-dgsw2l-crps-unroll12.
 
 ### 20261016T173000-dgsw2l-crps-unroll12-seed123 — tuning
 - Hypothesis: See 20261016T173000-dgsw2l-crps-unroll12.
@@ -577,12 +571,71 @@ persistence). Track both MSE and variance/KE diagnostics.
 - Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 281.7 / 426.8 / 0.008385 (std 0.92, KE 1.57); 10: 209 / 302.5 / 0.00313 (std 0.89, KE 0.58); 15: 197.1 / 315.8 / 0.002619 (std 0.94, KE 0.49); 20: 213.6 / 347.4 / 0.002595 (std 0.98, KE 0.64); 25: 199.2 / 385 / 0.002547 (std 1.00, KE 0.78); 30: 159.2 / 362 / 0.001976 (std 1.01, KE 0.86); 35: 138.7 / 252.1 / 0.001679 (std 1.00, KE 0.90); 40: 151.5 / 336 / 0.002236 (std 0.99, KE 0.91); 45: 136.3 / 343.5 / 0.002051 (std 0.99, KE 0.93); 50: 122.6 / 304.1 / 0.001865 (std 0.99, KE 0.94); 55: 156.9 / 453 / 0.002221 (std 0.98, KE 0.94); 60: 128.7 / 296.8 / 0.001873 (std 0.99, KE 0.94)
 - Conclusion: Seed replica; see 20261017T090000-dgsw2l-crps-smooth-increment.
 
+### 20261017T090000-dgsw2l-crps-smooth-increment-seed11 — tuning
+- Hypothesis: See 20261017T090000-dgsw2l-crps-smooth-increment.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 244.9 / 336.1 / 0.008225 (std 0.92, KE 1.46); 10: 188.9 / 255.6 / 0.00319 (std 0.89, KE 0.46); 15: 175 / 263.5 / 0.002685 (std 0.89, KE 0.37); 20: 167.7 / 295.2 / 0.00231 (std 0.94, KE 0.47); 25: 180.9 / 285.5 / 0.002266 (std 0.98, KE 0.66); 30: 136.5 / 318 / 0.001748 (std 0.98, KE 0.79); 35: 120 / 209.2 / 0.001708 (std 0.98, KE 0.87); 40: 130 / 321.5 / 0.001961 (std 0.98, KE 0.91); 45: 136.1 / 366.7 / 0.002037 (std 0.98, KE 0.93); 50: 146.1 / 435.9 / 0.002216 (std 0.98, KE 0.94); 55: 150.7 / 438.4 / 0.002309 (std 0.99, KE 0.93); 60: 143.6 / 416 / 0.002107 (std 0.98, KE 0.95)
+- Conclusion: Fourth incumbent seed for the matched comparison with 20261017T160000-dgsw2l-crps-coarse-noise8: final 143.6, epochs 30-60 within the incumbent's range.
 ### 20261017T110000-dgsw2l-crps-smooth06 — tuning
 - Hypothesis: Sigma 0.6 keeps the eddy-band spectrum ratio >= 0.9 and the seed-42 epochs 30-60 average within ~6 of the incumbent's 144.0, while still cutting the small-scale noise floor by >= 5x vs the incumbent.
 - Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 272.8 / 446.7 / 0.007471 (std 1.00, KE 1.36); 10: 231.5 / 473.4 / 0.003443 (std 1.07, KE 0.59); 15: 212.5 / 442.5 / 0.002903 (std 1.05, KE 0.48); 20: 210.4 / 335.4 / 0.00272 (std 1.02, KE 0.61); 25: 205.3 / 335.6 / 0.002448 (std 1.02, KE 0.76); 30: 150 / 368.2 / 0.001719 (std 1.01, KE 0.84); 35: 141.3 / 297.4 / 0.001639 (std 1.00, KE 0.90); 40: 172.5 / 274.8 / 0.001964 (std 0.98, KE 0.92); 45: 164.4 / 400 / 0.001968 (std 0.97, KE 0.93); 50: 160.5 / 297.5 / 0.00189 (std 0.97, KE 0.94); 55: 149.4 / 337.5 / 0.001887 (std 0.97, KE 0.95); 60: 154.6 / 367.5 / 0.00203 (std 0.97, KE 0.95)
 - Conclusion: Rejected. Gentler increment smoothing (sigma 0.6, seed 42, local Mac run: 60 min on MPS vs 30 min on the 16 GB RunPod tier) sits between no smoothing and sigma 1 on every fidelity measure without an MSE gain: grid-scale thickness spectrum excess 1547 (held-out L0) vs 337 at sigma 1 and 6852 without smoothing; eddy-band ratio 0.85 (no better than sigma 1's 0.83); the 25-year upper-layer KE drift returns (yearly 0.0047 -> 0.0062, above the truth's 0.0055 max). Epochs 30-60 156.1, final 154.6 (sigma-1 seed 42: 163.9 / 142.2; no smoothing: 144.0 / 147.6), all inside seed noise. Keep sigma 1.
 
+### 20261017T120000-dgsw2l-crps-coarse-noise — medium_step
+- Hypothesis: Coarse-scale noise (scale 4) on the smoothed incumbent further lowers the small-scale spectrum excess (held-out L0 below ~150 vs 337) and keeps the seed-42 epochs 30-60 eval_mse_mean within ~6 of the incumbent family's 3-seed mean (151.5), with KE ratio >= 0.9.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 275.4 / 449.3 / 0.008197 (std 1.00, KE 1.49); 10: 228 / 435 / 0.00372 (std 1.04, KE 0.65); 15: 198 / 409.7 / 0.002875 (std 1.03, KE 0.50); 20: 199.9 / 335.7 / 0.002558 (std 1.03, KE 0.60); 25: 198.6 / 325.2 / 0.002278 (std 1.02, KE 0.71); 30: 169.9 / 324.4 / 0.002007 (std 1.02, KE 0.80); 35: 158 / 279.4 / 0.002058 (std 1.01, KE 0.85); 40: 138.4 / 363.9 / 0.002045 (std 0.99, KE 0.90); 45: 132.2 / 244 / 0.001926 (std 0.98, KE 0.92); 50: 161.5 / 410.3 / 0.002323 (std 0.97, KE 0.93); 55: 165.1 / 405 / 0.002245 (std 0.98, KE 0.94); 60: 167.5 / 374.7 / 0.002225 (std 0.97, KE 0.95)
+- Conclusion: Strong candidate, not promoted (strict application of the promotion rule; flagged for the user). Stochastic inputs drawn on a 4x coarser grid on top of the smoothed incumbent, seeds 42/7/123 vs the incumbent's same seeds: better on every scorecard measure - predictable-range MSE 18.3 vs 18.8, realism 0.70 vs 0.99, grid-noise excess 0.94 vs 1.45 decades (held-out L0 small-scale excess 71-87 vs 337), long-run drift 0.22 vs 0.29 (25-year KE ends inside the truth's range for seed 7), eddy-band spectrum ratio 0.93-0.96 vs 0.83 - and level on epochs 30-60 eval_mse_mean (154 vs 152), but the final-checkpoint eval_mse_mean is 22 worse (165: 167.5 / 163.9 / 162.3, vs 143: 142.2 / 157.8 / 128.7), beyond the ~5-point allowance. The incumbent's final mean leans on one low seed (128.7), and the candidate's finals are unusually consistent, so the final-epoch gap may be partly luck; velocity MSE is slightly worse (0.0021 vs 0.0019). Run time 1626-1735 s on the 16 GB tier.
+
+### 20261017T120000-dgsw2l-crps-coarse-noise-seed7 — tuning
+- Hypothesis: See 20261017T120000-dgsw2l-crps-coarse-noise.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 270.7 / 400.7 / 0.01546 (std 0.88, KE 2.85); 10: 241.8 / 372 / 0.004517 (std 0.85, KE 0.76); 15: 214 / 352.1 / 0.002729 (std 0.93, KE 0.45); 20: 213.6 / 315 / 0.002369 (std 1.02, KE 0.64); 25: 211.6 / 326.4 / 0.002336 (std 1.03, KE 0.77); 30: 140.4 / 314.3 / 0.001584 (std 1.00, KE 0.85); 35: 140.5 / 257.4 / 0.001686 (std 0.99, KE 0.87); 40: 160.7 / 379.1 / 0.002005 (std 0.98, KE 0.91); 45: 164.4 / 434.8 / 0.002318 (std 0.98, KE 0.93); 50: 166.9 / 454.3 / 0.002297 (std 0.98, KE 0.93); 55: 162.3 / 442.7 / 0.002471 (std 0.98, KE 0.93); 60: 163.9 / 381.4 / 0.002474 (std 0.98, KE 0.93)
+- Conclusion: Seed replica; see 20261017T120000-dgsw2l-crps-coarse-noise.
+
+### 20261017T120000-dgsw2l-crps-coarse-noise-seed123 — tuning
+- Hypothesis: See 20261017T120000-dgsw2l-crps-coarse-noise.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 283.4 / 436.6 / 0.008487 (std 0.93, KE 1.58); 10: 211.2 / 331 / 0.00337 (std 0.95, KE 0.61); 15: 202.1 / 356.8 / 0.002703 (std 0.98, KE 0.48); 20: 197.6 / 371.6 / 0.002464 (std 1.01, KE 0.54); 25: 197.2 / 351.6 / 0.002274 (std 1.01, KE 0.75); 30: 160.7 / 323.5 / 0.001845 (std 1.00, KE 0.82); 35: 134 / 234.3 / 0.001606 (std 0.99, KE 0.88); 40: 135.1 / 226.1 / 0.001775 (std 0.99, KE 0.89); 45: 137.9 / 268.8 / 0.001781 (std 0.99, KE 0.92); 50: 147.5 / 319.6 / 0.001958 (std 0.99, KE 0.93); 55: 160.7 / 447 / 0.00224 (std 0.99, KE 0.92); 60: 162.3 / 437.4 / 0.002328 (std 0.98, KE 0.95)
+- Conclusion: Seed replica; see 20261017T120000-dgsw2l-crps-coarse-noise.
+
 ### 20261017T130000-dgsw2l-crps-smooth-noema — tuning
 - Hypothesis: Without EMA the smoothed CRPS model's held-out thickness variance ratio and upper-layer EKE map ratio rise above ~0.85 (from 0.73-0.78) while the seed-42 epochs 30-60 eval_mse_mean stays within ~10 of the incumbent family's 3-seed mean (151.5).
 - Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 378.4 / 898.4 / 0.003344 (std 1.13, KE 1.21); 10: 258.6 / 519.7 / 0.002513 (std 0.96, KE 0.89); 15: 215 / 365.5 / 0.00232 (std 0.97, KE 0.97); 20: 240.9 / 525.5 / 0.003098 (std 1.02, KE 0.92); 25: 238.3 / 516.4 / 0.002918 (std 0.96, KE 0.88); 30: 229.5 / 450.4 / 0.002706 (std 0.98, KE 1.11); 35: 163.1 / 220 / 0.001894 (std 0.98, KE 1.02); 40: 183.1 / 364.9 / 0.00232 (std 1.00, KE 0.92); 45: 180.9 / 416.6 / 0.002258 (std 0.94, KE 0.92); 50: 174.2 / 321.7 / 0.002054 (std 0.97, KE 1.00); 55: 170.1 / 281.2 / 0.001783 (std 0.97, KE 0.96); 60: 197.3 / 504.6 / 0.002752 (std 0.97, KE 0.95)
 - Conclusion: Rejected. Removing EMA from the smoothed CRPS model (seed 42, local Mac) does not restore eddy energy - the upper-layer held-out EKE map ratio stays 0.73 (incumbent 0.74) - and costs skill and stability: epochs 30-60 eval_mse_mean 185.5 vs the incumbent family's 3-seed 151.5, final 197.3, predictable MSE 20.4 vs 18.8, long-run drift score 0.62 vs 0.29 (KE ends at 0.0057, above the truth range). Realism 0.83 vs 0.99 is better only through larger large-scale spectra. EMA is not what damps the stochastic generator's spread; keep it.
+
+### 20261017T150000-dgsw2l-crps-coarse-nosmooth — medium_step
+- Hypothesis: Coarse noise without increment smoothing keeps the grid-noise excess within ~0.3 decades of the smoothed coarse-noise model, raises the held-out eddy-band ratios and EKE amplitude, and keeps predictable-range MSE and epochs 30-60 eval_mse_mean within seed noise of the incumbent.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 275.9 / 452.3 / 0.00809 (std 1.00, KE 1.47); 10: 234.7 / 470.8 / 0.003702 (std 1.04, KE 0.65); 15: 207.2 / 446.9 / 0.002923 (std 1.04, KE 0.52); 20: 199.5 / 368.6 / 0.002551 (std 1.02, KE 0.61); 25: 197.9 / 341.7 / 0.002326 (std 1.01, KE 0.73); 30: 156.8 / 295.9 / 0.001863 (std 1.01, KE 0.80); 35: 149.9 / 343.5 / 0.002044 (std 0.99, KE 0.87); 40: 131.4 / 265.6 / 0.001807 (std 1.00, KE 0.90); 45: 149.5 / 374 / 0.002222 (std 0.99, KE 0.93); 50: 169.5 / 462.4 / 0.002577 (std 0.99, KE 0.93); 55: 143.2 / 222 / 0.001971 (std 0.99, KE 0.94); 60: 139.5 / 258.1 / 0.002019 (std 0.98, KE 0.94)
+- Conclusion: Rejected. Coarse-scale noise without increment smoothing (seed 42, local Mac): good benchmark numbers for one seed (epochs 30-60 148.5, final 139.5) but realism falls back to 0.97 (smoothed coarse-noise 0.70), grid-noise excess rises to 1.92 decades (0.94) - held-out L0 small-scale excess 1111 vs 71-87 - and long-run drift is 0.49 (0.22); predictable-range MSE 20.4 vs 18.3. The grid-scale noise is generated by the network itself, not only passed through from white-noise inputs, so the increment smoothing remains necessary; coarse noise and smoothing are complementary.
+
+### 20261017T160000-dgsw2l-crps-coarse-noise8 — tuning
+- Hypothesis: Noise at 8x coarser resolution keeps realism at or below 0.70 and raises the final-checkpoint eval_mse_mean no further (seed 42 within ~10 of 167.5), with predictable-range MSE within ~1 of 18.3.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 277.1 / 446.6 / 0.008163 (std 0.99, KE 1.48); 10: 242 / 483.5 / 0.003722 (std 1.04, KE 0.64); 15: 217.6 / 480.9 / 0.002941 (std 1.04, KE 0.52); 20: 199.5 / 381.7 / 0.002507 (std 1.04, KE 0.58); 25: 207.3 / 337.8 / 0.002464 (std 1.03, KE 0.70); 30: 147.5 / 276.2 / 0.001767 (std 1.01, KE 0.80); 35: 145.6 / 291.3 / 0.001654 (std 1.00, KE 0.86); 40: 154.4 / 433.9 / 0.002202 (std 0.99, KE 0.90); 45: 156.3 / 500.6 / 0.002051 (std 0.99, KE 0.92); 50: 160.8 / 434.4 / 0.002136 (std 0.98, KE 0.92); 55: 157.4 / 460.1 / 0.00212 (std 0.98, KE 0.93); 60: 150.8 / 453.8 / 0.002073 (std 0.98, KE 0.93)
+- Conclusion: PROMOTED to incumbent by user decision (2026-10-16), overriding the strict promotion rule on the user's realism priority. Noise drawn 8x coarser with increment smoothing, 4 matched seeds (42/7/123/11) vs the previous incumbent: realism 0.72 vs 0.99, grid-noise excess 0.97 vs 1.45 decades, long-run drift 0.12 vs 0.29 (25-year KE inside the truth range), predictable-range MSE 17.5 +/- 1.1 vs 17.8 +/- 1.1, epochs 30-60 eval_mse_mean 152.5 +/- 2.3 vs 148.0 +/- 5.8 (level), final 157.6 +/- 2.7 vs 143.1 +/- 5.9 (~10% worse in the tail, mostly time-mean bias in the northern recirculation where the held-out years depart from the training climate). Seed-42 rollout regenerated locally: 146.7 / 379.0 / 0.00216.
+
+### 20261017T160000-dgsw2l-crps-coarse-noise8-seed7 — tuning
+- Hypothesis: See 20261017T160000-dgsw2l-crps-coarse-noise8.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 272.3 / 406.9 / 0.01581 (std 0.88, KE 2.92); 10: 247.3 / 374.3 / 0.004655 (std 0.84, KE 0.80); 15: 214.9 / 361.7 / 0.002789 (std 0.93, KE 0.46); 20: 209.4 / 351.9 / 0.002386 (std 1.01, KE 0.57); 25: 183.5 / 401.9 / 0.002255 (std 1.02, KE 0.75); 30: 150.9 / 298.5 / 0.001692 (std 1.01, KE 0.83); 35: 153.8 / 301.3 / 0.001616 (std 0.99, KE 0.88); 40: 126.8 / 241.3 / 0.001599 (std 0.99, KE 0.89); 45: 146.5 / 462.1 / 0.002017 (std 0.99, KE 0.91); 50: 147.9 / 427.7 / 0.002083 (std 0.98, KE 0.92); 55: 156.2 / 339.7 / 0.002008 (std 0.98, KE 0.93); 60: 155.9 / 460.8 / 0.002222 (std 0.97, KE 0.93)
+- Conclusion: Seed replica; see 20261017T160000-dgsw2l-crps-coarse-noise8.
+
+### 20261017T160000-dgsw2l-crps-coarse-noise8-seed123 — tuning
+- Hypothesis: See 20261017T160000-dgsw2l-crps-coarse-noise8.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 283.5 / 438 / 0.008784 (std 0.94, KE 1.64); 10: 213.5 / 352 / 0.00328 (std 0.93, KE 0.63); 15: 210.1 / 408.4 / 0.002636 (std 0.97, KE 0.50); 20: 196.4 / 369.1 / 0.00252 (std 0.99, KE 0.51); 25: 174.6 / 293.5 / 0.001944 (std 0.99, KE 0.68); 30: 161.1 / 260.8 / 0.001713 (std 0.99, KE 0.76); 35: 143.6 / 233.7 / 0.001738 (std 1.00, KE 0.83); 40: 145.5 / 312.8 / 0.001912 (std 0.99, KE 0.88); 45: 164 / 314.4 / 0.002346 (std 0.99, KE 0.89); 50: 168.5 / 466 / 0.002386 (std 0.98, KE 0.93); 55: 166.2 / 444.4 / 0.002419 (std 0.98, KE 0.92); 60: 162.7 / 468.9 / 0.002433 (std 0.98, KE 0.94)
+- Conclusion: Seed replica; see 20261017T160000-dgsw2l-crps-coarse-noise8.
+
+### 20261017T160000-dgsw2l-crps-coarse-noise8-seed11 — tuning
+- Hypothesis: See 20261017T160000-dgsw2l-crps-coarse-noise8.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 243.8 / 346.6 / 0.008041 (std 0.93, KE 1.42); 10: 195.5 / 279 / 0.00307 (std 0.92, KE 0.49); 15: 181.9 / 280.1 / 0.002752 (std 0.92, KE 0.42); 20: 176.4 / 270.7 / 0.002441 (std 0.95, KE 0.53); 25: 174.6 / 273.9 / 0.002299 (std 0.98, KE 0.70); 30: 147.9 / 293.7 / 0.001759 (std 0.98, KE 0.80); 35: 144.7 / 292.7 / 0.001592 (std 0.98, KE 0.86); 40: 157 / 276.7 / 0.002209 (std 0.98, KE 0.89); 45: 134.6 / 352.6 / 0.001976 (std 0.98, KE 0.93); 50: 145.7 / 409 / 0.002226 (std 0.98, KE 0.94); 55: 156.4 / 443.2 / 0.002416 (std 0.98, KE 0.95); 60: 161.1 / 437.9 / 0.002464 (std 0.97, KE 0.94)
+- Conclusion: Seed replica; see 20261017T160000-dgsw2l-crps-coarse-noise8.
+
+### 20261017T180000-dgsw2l-crps-coarse8-ch8 — tuning
+- Hypothesis: Eight coarse noise channels raise the held-out upper-layer EKE map ratio above ~0.85 and keep realism at or below ~0.72, predictable-range MSE within ~1 of 17.1 and eval_mse_mean within seed noise of the 8x model.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 261.8 / 389.7 / 0.004764 (std 0.98, KE 0.88); 10: 227.1 / 352.6 / 0.003048 (std 0.98, KE 0.59); 15: 194.8 / 324.6 / 0.002667 (std 0.98, KE 0.54); 20: 210.5 / 360.8 / 0.002491 (std 1.03, KE 0.64); 25: 217.6 / 383.6 / 0.00237 (std 1.05, KE 0.77); 30: 155.9 / 389.3 / 0.001689 (std 1.03, KE 0.85); 35: 141.9 / 310.8 / 0.00155 (std 1.00, KE 0.88); 40: 139.1 / 385.3 / 0.001769 (std 0.99, KE 0.92); 45: 131.5 / 407.7 / 0.001949 (std 0.98, KE 0.93); 50: 149.3 / 438 / 0.002166 (std 0.99, KE 0.94); 55: 157.5 / 457.4 / 0.002316 (std 0.98, KE 0.93); 60: 156 / 372.9 / 0.002392 (std 0.98, KE 0.92)
+- Conclusion: Not adopted (hypothesis target missed; single seed). Eight coarse noise channels (seed 42) do not raise held-out eddy energy (upper-layer EKE map ratio 0.73 vs 0.75 with 4 channels) - the stated target - although short-range skill and the benchmark improve for this seed (predictable-range MSE 15.9 vs 17.7, epochs 30-60 147 vs 153, final 156 vs 151) while realism and drift worsen slightly (0.78 vs 0.75; 0.18 vs 0.12). Across all models the held-out upper-layer EKE ratio sits at 0.73-0.83 while the 25-year runs reach 0.90-0.93 of the full record, and the held-out period is more energetic than the training climate (thickness variance 136 vs 125): the held-out EKE deficit largely reflects a free run relaxing to the model climate from an energetic period, which no emulator without eval-period information can match.
+
+### 20261017T200000-dgsw2l-crps-layer-noise — medium_step
+- Hypothesis: Halving lower-layer start-state noise lengthens the long-run lower-layer e-folding time toward the truth's 9.7 steps and raises its slow-band variance ratio, without worsening realism (<= ~0.75), drift (<= ~0.2) or predictable-range MSE (within ~1 of 17.7 for seed 42).
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 279.2 / 451.2 / 0.008565 (std 0.99, KE 1.56); 10: 225.5 / 410.7 / 0.003635 (std 1.02, KE 0.64); 15: 191.8 / 367.7 / 0.002777 (std 1.01, KE 0.51); 20: 201 / 333.7 / 0.0024 (std 1.02, KE 0.64); 25: 199 / 319.2 / 0.002332 (std 1.02, KE 0.73); 30: 164.2 / 231 / 0.002017 (std 1.01, KE 0.81); 35: 143.4 / 316.1 / 0.001826 (std 0.99, KE 0.88); 40: 140.6 / 401.8 / 0.00183 (std 0.98, KE 0.91); 45: 160.7 / 450.8 / 0.002196 (std 0.97, KE 0.93); 50: 151.6 / 424.5 / 0.002132 (std 0.98, KE 0.94); 55: 143.7 / 431.4 / 0.001968 (std 0.99, KE 0.95); 60: 154.4 / 460.8 / 0.0022 (std 0.98, KE 0.95)
+- Conclusion: Rejected (target missed; single seed). Halving the start-state noise in the lower layer (h1, u1, v1) on the 8x coarse-noise model does not lengthen lower-layer memory: long-run lower-layer thickness e-folding 6.6 steps vs 7.2 for the 8x model (truth 9.7) and slow-band variance 0.64 vs 0.74 (worse). Overall scorecard slightly better than the 8x model's seed 42 but within single-seed noise: realism 0.68 vs 0.75, drift 0.08 vs 0.12, predictable-range MSE 17.3 vs 17.7, eval_mse_mean 151 / 154 (epochs 30-60 / final) vs 153 / 151.
+
+### 20261017T220000-dgsw2l-crps-shared-start — medium_step
+- Hypothesis: With a shared start perturbation the CRPS model becomes genuinely stochastic: held-out spread/error ratio rises from ~0.01 to >= 0.3 over steps 1-26 and >= 0.5 beyond, with member realism <= ~0.8, drift <= ~0.2 and member eval_mse_mean within ~10% of the 8x model.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 270.8 / 398.7 / 0.00951 (std 0.94, KE 1.83); 10: 222.2 / 325.7 / 0.00368 (std 0.96, KE 0.79); 15: 193.3 / 254.9 / 0.002713 (std 0.93, KE 0.58); 20: 211.4 / 353 / 0.002687 (std 0.94, KE 0.61); 25: 225.4 / 309.1 / 0.002566 (std 1.00, KE 0.72); 30: 207 / 341.6 / 0.002335 (std 1.02, KE 0.80); 35: 198.1 / 435 / 0.002228 (std 1.01, KE 0.90); 40: 217.4 / 332.9 / 0.002778 (std 1.01, KE 0.91); 45: 204.9 / 257 / 0.002424 (std 0.99, KE 0.98); 50: 188.7 / 372.7 / 0.002275 (std 0.99, KE 0.98); 55: 192.2 / 443 / 0.002677 (std 1.00, KE 0.98); 60: 188.2 / 202.4 / 0.002156 (std 1.00, KE 0.99)
+- Conclusion: Not promoted, but a milestone: the first genuinely stochastic, calibrated ensemble. Giving both CRPS members the same start perturbation forces spread through the noise inputs: held-out spread/error ratio 1.49 over steps 1-26 (over-dispersive) and 0.95 beyond (calibrated), vs ~0.01 for every earlier CRPS model. The 4-member ensemble mean scores eval_mse_mean 129.5 - below climatology (136.8) for the first time - but it is a smoothed product. Individual members are worse forecasts: epochs 30-60 eval_mse_mean 200, final 188, predictable-range MSE 40.5 (vs 17.5 for the 8x model), realism 0.97 (0.70), grid-noise excess 1.8 decades (0.94), drift 0.26 (0.23). Likely cause of the early over-dispersion: in training the shared start perturbation (1 increment-std) must be covered by learned spread, which is too wide when evaluation starts from an unperturbed state.

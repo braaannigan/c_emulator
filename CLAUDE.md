@@ -34,7 +34,10 @@ research loop, use the `autoresearch` skill (`/autoresearch`).
   over seeds, its `predictable_mse` or `realism`/`drift_score` clearly
   improves and its multi-seed `eval_mse_mean` (epochs 30-60 and final) is
   not worse by more than the seed noise (~5 for a 3-seed mean); physical
-  realism takes priority over tail MSE.
+  realism takes priority over tail MSE. The user has accepted a ~10% worse
+  final-checkpoint `eval_mse_mean` for a clearly more realistic model (no
+  drift, much lower grid noise) at level short-range skill; flag such
+  trade-offs rather than rejecting them outright.
 
 ## Layout
 
