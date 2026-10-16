@@ -9,7 +9,7 @@ experiment:
     drift 0.21 vs 0.29) at equal predictable-range MSE (19.0 vs 18.8) but a final eval_mse_mean
     23 worse (166 vs 143), about 2 standard errors: borderline under the promotion rule.'
   hypothesis: See 20261017T120000-dgsw2l-crps-coarse-noise.
-  conclusion: null
+  conclusion: Seed replica; see 20261017T120000-dgsw2l-crps-coarse-noise.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

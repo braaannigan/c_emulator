@@ -8,7 +8,7 @@ experiment:
     grid-scale noise excess 4x (87 vs 337) and raised eddy-band and thickness-variance ratios
     (0.93 / 0.96 vs 0.83 / 0.91) at a level MSE.'
   hypothesis: See 20261017T120000-dgsw2l-crps-coarse-noise.
-  conclusion: null
+  conclusion: Seed replica; see 20261017T120000-dgsw2l-crps-coarse-noise.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

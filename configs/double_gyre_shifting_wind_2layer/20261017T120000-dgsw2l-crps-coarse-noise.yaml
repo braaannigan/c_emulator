@@ -14,7 +14,17 @@ experiment:
   hypothesis: Coarse-scale noise (scale 4) on the smoothed incumbent further lowers the small-scale
     spectrum excess (held-out L0 below ~150 vs 337) and keeps the seed-42 epochs 30-60 eval_mse_mean
     within ~6 of the incumbent family's 3-seed mean (151.5), with KE ratio >= 0.9.
-  conclusion: null
+  conclusion: 'Strong candidate, not promoted (strict application of the promotion rule; flagged
+    for the user). Stochastic inputs drawn on a 4x coarser grid on top of the smoothed incumbent,
+    seeds 42/7/123 vs the incumbent''s same seeds: better on every scorecard measure - predictable-range
+    MSE 18.3 vs 18.8, realism 0.70 vs 0.99, grid-noise excess 0.94 vs 1.45 decades (held-out
+    L0 small-scale excess 71-87 vs 337), long-run drift 0.22 vs 0.29 (25-year KE ends inside
+    the truth''s range for seed 7), eddy-band spectrum ratio 0.93-0.96 vs 0.83 - and level
+    on epochs 30-60 eval_mse_mean (154 vs 152), but the final-checkpoint eval_mse_mean is
+    22 worse (165: 167.5 / 163.9 / 162.3, vs 143: 142.2 / 157.8 / 128.7), beyond the ~5-point
+    allowance. The incumbent''s final mean leans on one low seed (128.7), and the candidate''s
+    finals are unusually consistent, so the final-epoch gap may be partly luck; velocity MSE
+    is slightly worse (0.0021 vs 0.0019). Run time 1626-1735 s on the 16 GB tier.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
