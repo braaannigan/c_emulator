@@ -15,7 +15,15 @@ experiment:
     autoencoder, the latent model reaches step-1 MSE below ~3, keeps every scheduled rollout
     from epoch 40 bounded with KE and h-std ratios within 0.8-1.2, and its epochs 50-80 eval_mse_mean
     is below ~170 (CRPS incumbent seed-42 epochs 30-60: 144.0).'
-  conclusion: null
+  conclusion: 'Failed: drifts; latent line closed. The 50x25x32 latent (3x compression) with
+    20 epochs of reconstruction-only pre-training and a frozen autoencoder lowers the reconstruction
+    floor (step-1 MSE 3.2-3.5 vs 12 for the 12x latent) but is still far behind grid-space
+    steppers (0.8) and drifts at long leads: step-50 MSE 270-330 (vs ~140), last-step 970-6550,
+    KE ratio at the last step 3-50 during epochs 30-60 before settling to ~3.4. Epochs 50-80
+    average 692.8 vs 144.0 for the CRPS incumbent''s seed-42 epochs 30-60. Training the stepper
+    against a frozen decoder removes the decoder''s ability to damp latent errors, and the
+    latent stepper has no physical constraint on its own dynamics. Three latent attempts all
+    lose to grid-space U-Nets; not pursued further.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
