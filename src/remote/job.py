@@ -93,6 +93,22 @@ def collect_outputs(repo_dir: Path, config: str, volume_dir: Path) -> dict[str, 
     }
 
 
+def run_diagnostics(repo_dir: Path, config: str, long_years: float, volume_dir: Path, run: Runner = subprocess.run) -> dict[str, Any]:
+    """Run the fidelity diagnostics on the freshly trained checkpoint; keep figures on the volume."""
+
+    command = ["python", "-u", "scripts/fidelity_diagnostics.py", "--config", config, "--long-years", str(long_years)]
+    proc = run(command, cwd=repo_dir, capture_output=True, text=True)
+    raw = yaml.safe_load((repo_dir / config).read_text())
+    experiment_id = raw["experiment"]["id"]
+    out_dir = repo_dir / Path(raw["paths"]["results_csv"]).parent / "diagnostics" / experiment_id
+    result: dict[str, Any] = {"returncode": proc.returncode, "stdout_tail": proc.stdout[-3000:], "stderr_tail": proc.stderr[-3000:]}
+    report = out_dir / "report.json"
+    if proc.returncode == 0 and report.exists():
+        result["report"] = json.loads(report.read_text())
+        shutil.copytree(out_dir, volume_dir / "outputs" / experiment_id / "diagnostics", dirs_exist_ok=True)
+    return result
+
+
 def run_job(job_input: dict[str, Any], work_dir: Path, volume_dir: Path, run: Runner = subprocess.run) -> dict[str, Any]:
     ref, config, smoke_test = validate_job(job_input)
     repo_dir = work_dir / "repo"
@@ -112,4 +128,6 @@ def run_job(job_input: dict[str, Any], work_dir: Path, volume_dir: Path, run: Ru
     }
     if proc.returncode == 0:
         result.update(collect_outputs(repo_dir, config, volume_dir))
+        if job_input.get("diagnostics") and not smoke_test:
+            result["diagnostics"] = run_diagnostics(repo_dir, config, float(job_input.get("long_years", 25)), volume_dir, run)
     return result

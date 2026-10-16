@@ -119,7 +119,7 @@ def test_collect_outputs_tolerates_missing_files(tmp_path):
     assert out["experiment_log"] is None and out["results_rows"] == [] and out["volume_outputs"] == []
 
 
-def fake_worker(tmp_path, returncode=0):
+def fake_worker(tmp_path, returncode=0, diagnostics_returncode=0):
     def run(cmd, **kwargs):
         if cmd[:2] == ["git", "clone"]:
             dest = Path(cmd[-1])
@@ -127,6 +127,12 @@ def fake_worker(tmp_path, returncode=0):
             write_repo(dest)
         elif "rev-parse" in cmd:
             return subprocess.CompletedProcess(cmd, 0, "abc123\n", "")
+        elif cmd[0] == "python" and "scripts/fidelity_diagnostics.py" in cmd:
+            out = kwargs["cwd"] / FAMILY_DIR / "diagnostics" / "exp"
+            out.mkdir(parents=True, exist_ok=True)
+            (out / "report.json").write_text(json.dumps({"held_out": {"eval_mse_mean": 1.0}}))
+            (out / "maps.png").write_bytes(b"png")
+            return subprocess.CompletedProcess(cmd, diagnostics_returncode, "diag ok", "")
         elif cmd[0] == "python":
             write_outputs(kwargs["cwd"])
             return subprocess.CompletedProcess(cmd, returncode, "x" * 5000 + "done", "warn")
@@ -191,3 +197,29 @@ def test_record_outputs_writes_log_and_appends_rows(tmp_path):
     assert results.read_text() == "header\nr1\nr2\n"
     assert written == [str(tmp_path / "logs" / "exp.json"), str(results)]
     assert record_outputs({"experiment_log": None}, tmp_path, results) == []
+
+
+def test_run_job_with_diagnostics_returns_report_and_keeps_figures(tmp_path):
+    volume = make_volume(tmp_path)
+    out = run_job({"ref": "exp", "config": CONFIG, "diagnostics": True, "long_years": 2}, tmp_path / "work", volume, fake_worker(tmp_path))
+    assert out["diagnostics"]["report"] == {"held_out": {"eval_mse_mean": 1.0}}
+    assert (volume / "outputs" / "exp" / "diagnostics" / "maps.png").read_bytes() == b"png"
+    failed = run_job({"ref": "exp", "config": CONFIG, "diagnostics": True}, tmp_path / "work2", volume, fake_worker(tmp_path, diagnostics_returncode=1))
+    assert failed["diagnostics"]["returncode"] == 1 and "report" not in failed["diagnostics"]
+    smoke = run_job({"ref": "exp", "config": CONFIG, "diagnostics": True, "smoke_test": True}, tmp_path / "work3", volume, fake_worker(tmp_path))
+    assert "diagnostics" not in smoke
+
+
+def test_record_outputs_writes_diagnostics_report(tmp_path):
+    results = tmp_path / "results.csv"
+    results.write_text("header\n")
+    output = {
+        "experiment_id": "exp",
+        "experiment_log_path": "data/fam/logs/exp.json",
+        "experiment_log": {"a": 1},
+        "results_rows": [],
+        "diagnostics": {"report": {"k": 2}},
+    }
+    written = record_outputs(output, tmp_path, results)
+    report = tmp_path / "data" / "fam" / "diagnostics" / "exp" / "report.json"
+    assert json.loads(report.read_text()) == {"k": 2} and str(report) in written

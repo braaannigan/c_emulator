@@ -32,11 +32,13 @@ def main() -> None:
     parser.add_argument("--ref", default=None)
     parser.add_argument("--smoke-test", action="store_true")
     parser.add_argument("--poll-seconds", type=float, default=30.0)
+    parser.add_argument("--diagnostics", action="store_true", help="Also run the fidelity diagnostics remotely and save the report locally")
+    parser.add_argument("--long-years", type=float, default=25.0)
     args = parser.parse_args()
     ref = args.ref or subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=ROOT, text=True).strip()
     endpoint_id = json.loads(ENDPOINT_FILE.read_text())["endpoint_id"]
     client = EndpointClient(endpoint_id, read_api_key(dict(os.environ), Path.home() / ".runpod" / "config.toml"))
-    job_id = client.submit({"ref": ref, "config": args.config, "smoke_test": args.smoke_test})
+    job_id = client.submit({"ref": ref, "config": args.config, "smoke_test": args.smoke_test, "diagnostics": args.diagnostics, "long_years": args.long_years})
     print(f"submitted job {job_id} (ref {ref})", flush=True)
     last = [""]
 

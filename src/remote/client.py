@@ -72,4 +72,10 @@ def record_outputs(output: dict[str, Any], repo_root: Path, results_csv: Path) -
         with results_csv.open("a") as handle:
             handle.write("".join(row + "\n" for row in rows))
         written.append(str(results_csv))
+    report = (output.get("diagnostics") or {}).get("report")
+    if report is not None:
+        report_path = repo_root / Path(output["experiment_log_path"]).parent.parent / "diagnostics" / output["experiment_id"] / "report.json"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, indent=2) + "\n")
+        written.append(str(report_path))
     return written
