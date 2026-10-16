@@ -13,7 +13,16 @@ experiment:
   hypothesis: Eight coarse noise channels raise the held-out upper-layer EKE map ratio above
     ~0.85 and keep realism at or below ~0.72, predictable-range MSE within ~1 of 17.1 and
     eval_mse_mean within seed noise of the 8x model.
-  conclusion: null
+  conclusion: 'Not adopted (hypothesis target missed; single seed). Eight coarse noise channels
+    (seed 42) do not raise held-out eddy energy (upper-layer EKE map ratio 0.73 vs 0.75 with
+    4 channels) - the stated target - although short-range skill and the benchmark improve
+    for this seed (predictable-range MSE 15.9 vs 17.7, epochs 30-60 147 vs 153, final 156
+    vs 151) while realism and drift worsen slightly (0.78 vs 0.75; 0.18 vs 0.12). Across all
+    models the held-out upper-layer EKE ratio sits at 0.73-0.83 while the 25-year runs reach
+    0.90-0.93 of the full record, and the held-out period is more energetic than the training
+    climate (thickness variance 136 vs 125): the held-out EKE deficit largely reflects a free
+    run relaxing to the model climate from an energetic period, which no emulator without
+    eval-period information can match.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
