@@ -10,3 +10,4 @@ data/double_gyre_shifting_wind_2layer/logs/*.json
 figs/
 .claude/settings.local.json
 data/**/checkpoints/
+data/**/diagnostics/

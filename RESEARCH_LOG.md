@@ -30,6 +30,27 @@
   six seeds in parallel; compare seed means of the final checkpoint and of
   epochs 30-60.
 
+- Fidelity diagnostics (`scripts/fidelity_diagnostics.py`, figures in
+  `data/double_gyre_shifting_wind_2layer/diagnostics/<id>/`), CRPS incumbent
+  vs deterministic EMA model:
+  - Held-out period: KE ratio 0.92 / 0.92 (truth = 1), thickness std ratio
+    0.92; EKE maps pattern correlation 0.95-0.97 (CRPS) but upper-layer EKE
+    amplitude 0.75 of truth; h e-folding time 4.4 vs 4.4 steps (L0).
+  - 25-year free run (from the end of the record, analytic wind): finite and
+    bounded; EKE maps correlation 0.98 with the full record; KE ratio 1.06
+    (CRPS) / 0.99 (EMA); low-frequency (periods > 50 steps) thickness
+    variance 0.98 / 0.65 of truth (CRPS) vs 0.69 / 0.61 (EMA), so the CRPS
+    model keeps more slow variability; decorrelation time L0 8.8 vs 7.7 steps
+    (CRPS) and 4.2 vs 7.7 (EMA, too fast).
+  - Defects: (1) a grid-scale noise floor - beyond ~0.1 cycles/cell (100 km)
+    the truth spectrum falls by 5-6 decades while both emulators flatten out
+    (CRPS ~15x more than EMA): unphysical small-scale noise, tiny in variance
+    but visible; (2) slow upward drift of upper-layer KE in the CRPS run
+    (yearly mean 0.0047 -> 0.0059 over 25 years, ending above the truth's
+    yearly range 0.0027-0.0055); (3) spurious thickness variance along the
+    western/eastern wall columns and too little variance in the northern
+    recirculation (L0) and the southern gyre (L1).
+
 Previous incumbents: `20261016T061500-dgsw2l-unet-ema` (deterministic U-Net
 with EMA; 6-seed epochs 30-60 149.6, final 146.4); `20261015T204500-dgsw2l-unet-multiscale` (U-Net, MPS
 final 155.8 / 148.0; CUDA 3-seed final 148.9, epochs 30-60 167.1);
