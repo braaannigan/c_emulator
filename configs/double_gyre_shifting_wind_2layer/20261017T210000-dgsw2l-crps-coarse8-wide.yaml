@@ -15,12 +15,16 @@ experiment:
     climate there.'
   hypothesis: 'A 48-channel U-Net lowers seed-42 predictable-range MSE below ~16.5 (8x model:
     17.7) with realism <= ~0.75 and drift <= ~0.2, and benchmark MSE within seed noise.'
-  conclusion: 'Promising (seed 42, local Mac; seeds 7 and 123 queued on the hourly pod). A
-    48-channel U-Net (~4.4M params) on the 8x coarse-noise incumbent: predictable-range MSE
-    15.1 (incumbent seed 42 17.7; 4-seed mean 17.5), epochs 30-60 eval_mse_mean 143 (152.5),
-    final 157 (157.6), realism 0.75 (0.70), grid-noise excess 1.04 decades (0.97), long-run
-    drift 0.04 (0.12; 25-year KE 0.00477 -> 0.00481, flat inside the truth range). Unlike
-    depth-4 under MSE, extra width does not over-fit under the CRPS objective.'
+  conclusion: 'PROMOTED to incumbent under the promotion rule (3 matched seeds 42/7/123 vs
+    the 8x coarse-noise incumbent). A 48-channel U-Net (~4.4M params) on the 8x coarse-noise
+    recipe: predictable-range MSE 16.1 vs 18.2 (~11% better short-range skill), epochs 30-60
+    eval_mse_mean 149.6 vs 153.4, final 163.3 vs 156.5 (within final-checkpoint seed noise),
+    realism 0.72 vs 0.70 (level), long-run drift 0.05 vs 0.23 (25-year KE flat inside the
+    truth range), grid-noise excess 1.07 vs 0.94 decades. Width does not over-fit under the
+    CRPS objective (unlike depth 4 under MSE). Seeds 7 and 123 ran concurrently on an hourly
+    community RTX 3090 pod (75 min, ~$0.28 for both); a third concurrent job ran out of GPU
+    memory (each run needs ~10.7 GB). Full rollout NetCDF and animations pending: the Mac
+    GPU is paused at the user''s request.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

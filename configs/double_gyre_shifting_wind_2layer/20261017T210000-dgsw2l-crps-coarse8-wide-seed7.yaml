@@ -7,7 +7,7 @@ experiment:
   rationale: 'Seed replica of 20261017T210000-dgsw2l-crps-coarse8-wide (seed 42: predictable-range
     MSE 15.1 vs 17.5, epochs 30-60 143 vs 152.5, drift 0.04), run on the hourly pod queue.'
   hypothesis: See 20261017T210000-dgsw2l-crps-coarse8-wide.
-  conclusion: null
+  conclusion: Seed replica; see 20261017T210000-dgsw2l-crps-coarse8-wide (promoted).
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

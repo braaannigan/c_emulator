@@ -2,33 +2,32 @@
 
 ## Current incumbent
 
-`20261017T160000-dgsw2l-crps-coarse-noise8` (seeds 42, 7, 123, 11:
-`-seed7`, `-seed123`, `-seed11`). Promoted by user decision on physical
-realism (2026-10-16).
+`20261017T210000-dgsw2l-crps-coarse8-wide` (seeds 42, 7, 123: `-seed7`,
+`-seed123`; seed 11 pending).
 
-- Recipe: the smoothed CRPS U-Net with its 4 stochastic input channels drawn
-  on an 8x coarser grid (25x13) and bilinearly upsampled. Stochastic 3-level
-  U-Net (32/64/128/256 ch), two-member fair CRPS over 8-step unrolls, fixed
-  land-aware Gaussian increment smoothing (sigma 1 cell), residual target,
-  exact per-layer volume conservation over wet cells, pinned land, static
-  inputs (train-mean state, coordinates, land mask), start-state noise of 1
-  increment-std, EMA weights (0.998), Adam 3e-4, batch 8, clip 1.0, 60 epochs.
-- Four matched seeds vs the previous incumbent (smoothed CRPS): realism 0.72
-  vs 0.99, grid-noise excess 0.97 vs 1.45 decades, long-run drift 0.12 vs
-  0.29, predictable-range MSE 17.5 vs 17.8, epochs 30-60 eval_mse_mean 152.5
-  vs 148.0 (level), final 157.6 vs 143.1 (~10% worse tail MSE, mostly
-  time-mean bias in the northern recirculation).
-- Caveat: despite its noise inputs the model is effectively deterministic
-  (4-8 members have spread/error ~0.01); see the crps-shared-start
-  experiments for genuinely stochastic training.
-- Seed-42 final rollout (regenerated locally): 146.7 / last 379.0 / vel
-  0.00216.
-- Full rollout: `data/double_gyre_shifting_wind_2layer/rollout/20261017T160000-dgsw2l-crps-coarse-noise8-final-epoch0060.nc`;
-  checkpoint `data/double_gyre_shifting_wind_2layer/checkpoints/20261017T160000-dgsw2l-crps-coarse-noise8.pt`;
-  animations `figs/20261017T160000-dgsw2l-crps-coarse-noise8-{long,held-out}-layer0.mp4`.
-- Experiments: one job at a time on the cheap RunPod endpoint
-  (`scripts/runpod_run.py --diagnostics`) plus one local run on the Mac GPU;
-  compare with `scripts/scorecard_table.py`.
+- Recipe: the 8x coarse-noise CRPS recipe with a 1.5x wider U-Net
+  (48/96/192/384 channels, ~4.4M params). Stochastic inputs: 4 noise
+  channels drawn on an 8x coarser grid and upsampled; two-member fair CRPS
+  over 8-step unrolls; land-aware Gaussian increment smoothing (sigma 1
+  cell); residual target; exact per-layer volume conservation over wet
+  cells; pinned land; static inputs (train-mean state, coordinates, land
+  mask); start-state noise 1 increment-std; EMA weights (0.998); Adam 3e-4,
+  batch 8, clip 1.0, 60 epochs. Needs ~10.7 GB GPU memory per run.
+- Three matched seeds vs the previous incumbent: predictable-range MSE 16.1
+  vs 18.2, epochs 30-60 eval_mse_mean 149.6 vs 153.4, final 163.3 vs 156.5
+  (within noise), realism 0.72 vs 0.70, long-run drift 0.05 vs 0.23.
+- Caveat: like all CRPS models so far it is effectively deterministic
+  (ensemble spread/error ~0.01); see the crps-shared-start experiments.
+- Checkpoint (seed 42): `data/double_gyre_shifting_wind_2layer/checkpoints/20261017T210000-dgsw2l-crps-coarse8-wide.pt`;
+  diagnostics `data/double_gyre_shifting_wind_2layer/diagnostics/<id>/`.
+  Full rollout NetCDF and animations pending (Mac GPU paused).
+- Experiments: hourly RunPod pod queue (`scripts/runpod_pod_queue.py`,
+  2 concurrent wide runs per 24 GB GPU) or the serverless endpoint
+  (`scripts/runpod_run.py`); compare with `scripts/scorecard_table.py`.
+
+Previous incumbent (8x coarse noise, 32 channels):
+`20261017T160000-dgsw2l-crps-coarse-noise8` - 4-seed final 157.6, epochs
+30-60 152.5, predictable-range MSE 17.5, realism 0.72, drift 0.12.
 
 Previous incumbent (smoothed CRPS, per-cell noise):
 `20261017T090000-dgsw2l-crps-smooth-increment` - 4-seed final 143.1,
@@ -643,4 +642,14 @@ persistence). Track both MSE and variance/KE diagnostics.
 ### 20261017T210000-dgsw2l-crps-coarse8-wide — tuning
 - Hypothesis: A 48-channel U-Net lowers seed-42 predictable-range MSE below ~16.5 (8x model: 17.7) with realism <= ~0.75 and drift <= ~0.2, and benchmark MSE within seed noise.
 - Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 254.7 / 357.8 / 0.003873 (std 0.97, KE 0.68); 10: 195.9 / 300.6 / 0.002641 (std 0.96, KE 0.46); 15: 192.5 / 346.4 / 0.002474 (std 0.97, KE 0.44); 20: 189.5 / 345.3 / 0.002189 (std 1.00, KE 0.56); 25: 177.4 / 256.4 / 0.001915 (std 1.00, KE 0.72); 30: 131.9 / 350 / 0.001538 (std 0.99, KE 0.82); 35: 125.2 / 307.8 / 0.001549 (std 1.00, KE 0.87); 40: 146.1 / 345.7 / 0.002167 (std 0.98, KE 0.89); 45: 145.7 / 411.1 / 0.002182 (std 0.98, KE 0.92); 50: 148.8 / 370.4 / 0.002437 (std 0.98, KE 0.92); 55: 150.1 / 363.3 / 0.002488 (std 0.99, KE 0.92); 60: 156.7 / 439.1 / 0.002506 (std 0.98, KE 0.94)
-- Conclusion: Promising (seed 42, local Mac; seeds 7 and 123 queued on the hourly pod). A 48-channel U-Net (~4.4M params) on the 8x coarse-noise incumbent: predictable-range MSE 15.1 (incumbent seed 42 17.7; 4-seed mean 17.5), epochs 30-60 eval_mse_mean 143 (152.5), final 157 (157.6), realism 0.75 (0.70), grid-noise excess 1.04 decades (0.97), long-run drift 0.04 (0.12; 25-year KE 0.00477 -> 0.00481, flat inside the truth range). Unlike depth-4 under MSE, extra width does not over-fit under the CRPS objective.
+- Conclusion: PROMOTED to incumbent under the promotion rule (3 matched seeds 42/7/123 vs the 8x coarse-noise incumbent). A 48-channel U-Net (~4.4M params) on the 8x coarse-noise recipe: predictable-range MSE 16.1 vs 18.2 (~11% better short-range skill), epochs 30-60 eval_mse_mean 149.6 vs 153.4, final 163.3 vs 156.5 (within final-checkpoint seed noise), realism 0.72 vs 0.70 (level), long-run drift 0.05 vs 0.23 (25-year KE flat inside the truth range), grid-noise excess 1.07 vs 0.94 decades. Width does not over-fit under the CRPS objective (unlike depth 4 under MSE). Seeds 7 and 123 ran concurrently on an hourly community RTX 3090 pod (75 min, ~$0.28 for both); a third concurrent job ran out of GPU memory (each run needs ~10.7 GB). Full rollout NetCDF and animations pending: the Mac GPU is paused at the user's request.
+
+### 20261017T210000-dgsw2l-crps-coarse8-wide-seed7 — tuning
+- Hypothesis: See 20261017T210000-dgsw2l-crps-coarse8-wide.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 236.7 / 329.9 / 0.003553 (std 0.93, KE 0.60); 10: 193.3 / 283.2 / 0.002834 (std 0.89, KE 0.38); 15: 179.1 / 284.6 / 0.002699 (std 0.91, KE 0.39); 20: 181.2 / 302.3 / 0.002458 (std 0.98, KE 0.62); 25: 160.4 / 259.5 / 0.002158 (std 1.00, KE 0.79); 30: 140.8 / 356.5 / 0.001555 (std 1.00, KE 0.87); 35: 149.3 / 244 / 0.001703 (std 0.99, KE 0.91); 40: 142.9 / 406.8 / 0.002025 (std 0.99, KE 0.93); 45: 158.8 / 414.4 / 0.002184 (std 0.98, KE 0.94); 50: 165.8 / 448.4 / 0.002332 (std 0.98, KE 0.95); 55: 163.2 / 417.5 / 0.002334 (std 0.98, KE 0.95); 60: 165.7 / 418.8 / 0.002374 (std 0.98, KE 0.95)
+- Conclusion: Seed replica; see 20261017T210000-dgsw2l-crps-coarse8-wide (promoted).
+
+### 20261017T210000-dgsw2l-crps-coarse8-wide-seed123 — tuning
+- Hypothesis: See 20261017T210000-dgsw2l-crps-coarse8-wide.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 226.3 / 313.7 / 0.005472 (std 0.95, KE 1.01); 10: 177.9 / 274.6 / 0.002951 (std 0.94, KE 0.54); 15: 172.8 / 321.5 / 0.002567 (std 0.95, KE 0.47); 20: 179.3 / 305.3 / 0.002505 (std 0.98, KE 0.66); 25: 168 / 302.3 / 0.002184 (std 0.98, KE 0.81); 30: 153.5 / 334.1 / 0.00197 (std 0.99, KE 0.87); 35: 125.5 / 141.9 / 0.001665 (std 0.98, KE 0.90); 40: 146.1 / 353.6 / 0.002157 (std 0.98, KE 0.92); 45: 144.1 / 419 / 0.002075 (std 0.98, KE 0.94); 50: 153.5 / 457.1 / 0.002315 (std 0.98, KE 0.95); 55: 160.6 / 465.6 / 0.002445 (std 0.98, KE 0.95); 60: 167.6 / 391.4 / 0.002597 (std 0.98, KE 0.94)
+- Conclusion: Seed replica; see 20261017T210000-dgsw2l-crps-coarse8-wide (promoted).
