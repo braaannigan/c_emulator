@@ -18,7 +18,20 @@ experiment:
     (L0), removes the wall streaks, keeps the large/eddy-band spectrum ratios within 0.8-1.2
     and KE ratio >= 0.85, and keeps the seed-42 epochs 30-60 eval_mse_mean within ~6 of the
     incumbent's seed-42 144.0.
-  conclusion: null
+  conclusion: 'Supported; promoted to incumbent on physical fidelity at equal primary score
+    (3 seeds; user priority: realism). Land-aware Gaussian smoothing of each step''s increment
+    (sigma 1 cell) on the CRPS incumbent. Seeds 42/7/123 vs the CRPS incumbent''s same seeds:
+    epochs 30-60 eval_mse_mean 163.9 / 148.7 / 142.0 (mean 151.5) vs 144.0 / 149.7 / 146.5
+    (mean 146.7); final 142.2 / 157.8 / 128.7 (mean 142.9) vs 147.6 / 151.5 / 163.7 (mean
+    154.3): level within seed noise. Fidelity diagnostics (seed 42): grid-scale (0.2-0.5 cycles/cell)
+    thickness spectrum excess over truth cut ~20x (held-out L0 337 vs 6852; 25-year run 3036
+    vs 65120); 25-year upper-layer KE now ends inside the truth''s yearly range (0.0055 vs
+    0.0059 for the CRPS model; truth max 0.0055); long-run KE ratio 1.02 vs 1.06; EKE maps
+    correlation 0.97-0.99; eddy-band held-out spectrum ratio slightly lower (L0 0.83 vs 0.94).
+    Remaining defects: wall streaks reduced but present; held-out upper-layer EKE amplitude
+    0.74 of truth. Velocity MSE 0.0019-0.0020 (level). Seed-42 rollout regenerated locally:
+    135.5 / 377.0 / 0.00199. Seed 123 ran on the 16 GB endpoint in 1786 s (vs 650-880 s on
+    an RTX 4090).'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

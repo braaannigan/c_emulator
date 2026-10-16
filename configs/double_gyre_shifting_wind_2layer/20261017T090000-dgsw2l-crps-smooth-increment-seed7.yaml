@@ -9,7 +9,7 @@ experiment:
     but a worse epochs 30-60 average (163.9 vs 144.0); one seed cannot separate that from
     chaotic checkpoint noise.'
   hypothesis: See 20261017T090000-dgsw2l-crps-smooth-increment.
-  conclusion: null
+  conclusion: Seed replica; see 20261017T090000-dgsw2l-crps-smooth-increment.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

@@ -8,7 +8,7 @@ experiment:
     7 matched the incumbent (epochs 30-60 148.7 vs 149.7) while seed 42 was 20 worse. Also
     the first run on the cheaper 16 GB endpoint, to measure cost per run.'
   hypothesis: See 20261017T090000-dgsw2l-crps-smooth-increment.
-  conclusion: null
+  conclusion: Seed replica; see 20261017T090000-dgsw2l-crps-smooth-increment.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

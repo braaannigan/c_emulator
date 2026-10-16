@@ -2,35 +2,38 @@
 
 ## Current incumbent
 
-`20261016T140000-dgsw2l-unet-ema-crps` (six seeds on RunPod: 42, 7, 123, 11,
-19, 23 as `-seed<N>`).
+`20261017T090000-dgsw2l-crps-smooth-increment` (seeds 42, 7, 123 on RunPod:
+`-seed7`, `-seed123`).
 
-- Recipe: stochastic 3-level U-Net (32/64/128/256 ch) with 4 fresh standard
-  normal input channels per step, trained with a two-member fair CRPS over
-  8-step unrolls; residual target, exact per-layer volume conservation over
-  wet cells, land ring pinned, static inputs (train-mean state, coordinates,
-  land mask), start-state noise of 1 increment-std, EMA weights (0.998),
-  Adam 3e-4, batch 8, clip 1.0, 60 epochs. Each rollout is one sharp
-  ensemble member.
-- Six-seed scores vs the previous (deterministic EMA) incumbent's six seeds:
-  epochs 30-60 eval_mse_mean 145.4 +/- 1.3 vs 149.6 +/- 2.8; final 151.1 +/-
-  3.6 vs 146.4 +/- 7.3 (primary score level within noise); velocity MSE
-  0.00195 vs 0.00206; step-20 thickness MSE 15.0 vs 21.3; KE ratio at the last
-  rollout step 0.86 vs 0.80; h-std ratio 0.99-1.00. Promoted on physical
-  realism and mid-lead skill at equal primary score (user priority).
-- Seed-42 final rollout (regenerated locally): 147.3 / last 435.6 / vel
-  0.00212; MSE = bias^2 14.7 + var_truth 125.2 + var_model 106.3 - 2cov 98.8.
-- Not below climatology (136.8): beyond ~50 steps any realistic free run
-  saturates near 2x climate variance; lowering the score further would need
-  smoothing (ensemble mean), which the user ruled out in favour of realism.
-- Full rollout: `data/double_gyre_shifting_wind_2layer/rollout/20261016T140000-dgsw2l-unet-ema-crps-final-epoch0060.nc`;
-  checkpoint `data/double_gyre_shifting_wind_2layer/checkpoints/20261016T140000-dgsw2l-unet-ema-crps.pt`
-  (all remote outputs also on the RunPod volume under `outputs/<id>/`).
-- Experiments run on the RunPod endpoint (`scripts/runpod_run.py`), three or
-  six seeds in parallel; compare seed means of the final checkpoint and of
-  epochs 30-60.
+- Recipe: the stochastic CRPS U-Net below plus a fixed, land-aware Gaussian
+  smoothing (sigma 1 cell) of every step's increment before the volume
+  projection - a scale-selective dissipation analogous to the source model's
+  viscosity. Stochastic 3-level U-Net (32/64/128/256 ch) with 4 fresh noise
+  channels per step, two-member fair CRPS over 8-step unrolls, residual
+  target, exact per-layer volume conservation over wet cells, pinned land,
+  static inputs (train-mean state, coordinates, land mask), start-state noise
+  of 1 increment-std, EMA weights (0.998), Adam 3e-4, batch 8, clip 1.0, 60
+  epochs.
+- Three-seed scores vs the CRPS model's same seeds: epochs 30-60 151.5 vs
+  146.7, final 142.9 vs 154.3 (level within noise). Promoted on fidelity:
+  grid-scale noise floor ~20x lower, no KE drift over a 25-year free run
+  (ends inside the truth's yearly range), long-run KE ratio 1.02, EKE maps
+  correlation 0.97-0.99.
+- Seed-42 final rollout (regenerated locally): 135.5 / last 377.0 / vel
+  0.00199.
+- Full rollout: `data/double_gyre_shifting_wind_2layer/rollout/20261017T090000-dgsw2l-crps-smooth-increment-final-epoch0060.nc`;
+  checkpoint `data/double_gyre_shifting_wind_2layer/checkpoints/20261017T090000-dgsw2l-crps-smooth-increment.pt`;
+  diagnostics `data/double_gyre_shifting_wind_2layer/diagnostics/<id>/`;
+  animations `figs/<id>-{long,held-out}-layer0.mp4`.
+- Experiments: one job at a time on the cheap RunPod endpoint
+  (`scripts/runpod_run.py`, add `--diagnostics` for remote fidelity
+  reports) plus one local run on the Mac GPU.
 
-- Fidelity diagnostics (`scripts/fidelity_diagnostics.py`, figures in
+Previous incumbent (CRPS without smoothing):
+`20261016T140000-dgsw2l-unet-ema-crps` - stochastic CRPS U-Net with EMA;
+six-seed epochs 30-60 145.4, final 151.1, KE at the last step 0.86.
+
+- Fidelity diagnostics of the CRPS model (`scripts/fidelity_diagnostics.py`, figures in
   `data/double_gyre_shifting_wind_2layer/diagnostics/<id>/`), CRPS incumbent
   vs deterministic EMA model:
   - Held-out period: KE ratio 0.92 / 0.92 (truth = 1), thickness std ratio
@@ -547,3 +550,18 @@ persistence). Track both MSE and variance/KE diagnostics.
 - Hypothesis: With a 50x25x32 latent, a 20-epoch reconstruction-only pre-training and a frozen autoencoder, the latent model reaches step-1 MSE below ~3, keeps every scheduled rollout from epoch 40 bounded with KE and h-std ratios within 0.8-1.2, and its epochs 50-80 eval_mse_mean is below ~170 (CRPS incumbent seed-42 epochs 30-60: 144.0).
 - Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 1167 / 1216 / 0.004317 (std 0.21, KE 0.07); 10: 749.9 / 951 / 0.004169 (std 0.37, KE 0.28); 15: 475 / 837.5 / 0.005992 (std 0.62, KE 0.85); 20: 391 / 858.6 / 0.008838 (std 0.81, KE 1.58); 25: 342.5 / 669.5 / 0.007227 (std 0.72, KE 1.34); 30: 924.1 / 5012 / 0.03912 (std 1.06, KE 6.99); 35: 1013 / 4584 / 0.04904 (std 1.09, KE 8.97); 40: 1254 / 6552 / 0.04833 (std 1.09, KE 9.00); 45: 1052 / 4796 / 0.03303 (std 1.03, KE 6.29); 50: 954.8 / 3948 / 0.02084 (std 0.93, KE 4.03); 55: 893.1 / 3632 / 0.01301 (std 0.84, KE 2.56); 60: 770.9 / 2598 / 0.008386 (std 0.77, KE 1.68); 65: 652.1 / 1778 / 0.006613 (std 0.72, KE 1.28); 70: 571.2 / 1337 / 0.006603 (std 0.70, KE 1.23); 75: 519.7 / 1092 / 0.006698 (std 0.71, KE 1.24); 80: 487.9 / 971.5 / 0.006683 (std 0.73, KE 1.26)
 - Conclusion: Failed: drifts; latent line closed. The 50x25x32 latent (3x compression) with 20 epochs of reconstruction-only pre-training and a frozen autoencoder lowers the reconstruction floor (step-1 MSE 3.2-3.5 vs 12 for the 12x latent) but is still far behind grid-space steppers (0.8) and drifts at long leads: step-50 MSE 270-330 (vs ~140), last-step 970-6550, KE ratio at the last step 3-50 during epochs 30-60 before settling to ~3.4. Epochs 50-80 average 692.8 vs 144.0 for the CRPS incumbent's seed-42 epochs 30-60. Training the stepper against a frozen decoder removes the decoder's ability to damp latent errors, and the latent stepper has no physical constraint on its own dynamics. Three latent attempts all lose to grid-space U-Nets; not pursued further.
+
+### 20261017T090000-dgsw2l-crps-smooth-increment — medium_step
+- Hypothesis: Gaussian increment smoothing (sigma 1 cell) cuts the small-scale (0.2-0.5 cycles/cell) thickness spectrum ratio on the held-out period by at least 10x from the incumbent's ~6900 (L0), removes the wall streaks, keeps the large/eddy-band spectrum ratios within 0.8-1.2 and KE ratio >= 0.85, and keeps the seed-42 epochs 30-60 eval_mse_mean within ~6 of the incumbent's seed-42 144.0.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 273 / 446.3 / 0.007482 (std 1.00, KE 1.36); 10: 232.4 / 473.8 / 0.003424 (std 1.07, KE 0.58); 15: 215.9 / 440.8 / 0.002891 (std 1.06, KE 0.48); 20: 212.3 / 341.9 / 0.002671 (std 1.03, KE 0.61); 25: 209.3 / 351.5 / 0.002459 (std 1.02, KE 0.76); 30: 170.6 / 377.5 / 0.002043 (std 1.02, KE 0.83); 35: 164.5 / 273.9 / 0.001913 (std 1.00, KE 0.88); 40: 187.3 / 331.5 / 0.001974 (std 0.98, KE 0.91); 45: 159.2 / 372.6 / 0.001958 (std 0.97, KE 0.92); 50: 163.3 / 372.4 / 0.002004 (std 0.96, KE 0.93); 55: 160.6 / 414.1 / 0.00207 (std 0.97, KE 0.94); 60: 142.2 / 254.5 / 0.00185 (std 0.98, KE 0.93)
+- Conclusion: Supported; promoted to incumbent on physical fidelity at equal primary score (3 seeds; user priority: realism). Land-aware Gaussian smoothing of each step's increment (sigma 1 cell) on the CRPS incumbent. Seeds 42/7/123 vs the CRPS incumbent's same seeds: epochs 30-60 eval_mse_mean 163.9 / 148.7 / 142.0 (mean 151.5) vs 144.0 / 149.7 / 146.5 (mean 146.7); final 142.2 / 157.8 / 128.7 (mean 142.9) vs 147.6 / 151.5 / 163.7 (mean 154.3): level within seed noise. Fidelity diagnostics (seed 42): grid-scale (0.2-0.5 cycles/cell) thickness spectrum excess over truth cut ~20x (held-out L0 337 vs 6852; 25-year run 3036 vs 65120); 25-year upper-layer KE now ends inside the truth's yearly range (0.0055 vs 0.0059 for the CRPS model; truth max 0.0055); long-run KE ratio 1.02 vs 1.06; EKE maps correlation 0.97-0.99; eddy-band held-out spectrum ratio slightly lower (L0 0.83 vs 0.94). Remaining defects: wall streaks reduced but present; held-out upper-layer EKE amplitude 0.74 of truth. Velocity MSE 0.0019-0.0020 (level). Seed-42 rollout regenerated locally: 135.5 / 377.0 / 0.00199. Seed 123 ran on the 16 GB endpoint in 1786 s (vs 650-880 s on an RTX 4090).
+
+### 20261017T090000-dgsw2l-crps-smooth-increment-seed7 — tuning
+- Hypothesis: See 20261017T090000-dgsw2l-crps-smooth-increment.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 271 / 401.6 / 0.01499 (std 0.89, KE 2.75); 10: 217.1 / 323.3 / 0.00417 (std 0.88, KE 0.66); 15: 208.1 / 373.9 / 0.002692 (std 0.97, KE 0.38); 20: 223.5 / 360.2 / 0.002425 (std 1.03, KE 0.58); 25: 193.3 / 322.5 / 0.002238 (std 1.02, KE 0.72); 30: 141.4 / 313.7 / 0.001523 (std 1.00, KE 0.81); 35: 137.8 / 237.7 / 0.001605 (std 0.99, KE 0.88); 40: 138.2 / 369.4 / 0.001688 (std 0.98, KE 0.91); 45: 152.9 / 427.6 / 0.0019 (std 0.97, KE 0.92); 50: 156.9 / 467.2 / 0.002165 (std 0.97, KE 0.93); 55: 155.6 / 470.2 / 0.002142 (std 0.97, KE 0.93); 60: 157.8 / 469.4 / 0.002189 (std 0.97, KE 0.94)
+- Conclusion: Seed replica; see 20261017T090000-dgsw2l-crps-smooth-increment.
+
+### 20261017T090000-dgsw2l-crps-smooth-increment-seed123 — tuning
+- Hypothesis: See 20261017T090000-dgsw2l-crps-smooth-increment.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 281.7 / 426.8 / 0.008385 (std 0.92, KE 1.57); 10: 209 / 302.5 / 0.00313 (std 0.89, KE 0.58); 15: 197.1 / 315.8 / 0.002619 (std 0.94, KE 0.49); 20: 213.6 / 347.4 / 0.002595 (std 0.98, KE 0.64); 25: 199.2 / 385 / 0.002547 (std 1.00, KE 0.78); 30: 159.2 / 362 / 0.001976 (std 1.01, KE 0.86); 35: 138.7 / 252.1 / 0.001679 (std 1.00, KE 0.90); 40: 151.5 / 336 / 0.002236 (std 0.99, KE 0.91); 45: 136.3 / 343.5 / 0.002051 (std 0.99, KE 0.93); 50: 122.6 / 304.1 / 0.001865 (std 0.99, KE 0.94); 55: 156.9 / 453 / 0.002221 (std 0.98, KE 0.94); 60: 128.7 / 296.8 / 0.001873 (std 0.99, KE 0.94)
+- Conclusion: Seed replica; see 20261017T090000-dgsw2l-crps-smooth-increment.
