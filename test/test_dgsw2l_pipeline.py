@@ -326,3 +326,33 @@ def test_crps_start_noise_spares_fixed_land_cells():
     states = torch.zeros(1, 2, 6, 2, 2)
     loss = unrolled_crps_loss(stepper, states, torch.zeros(1, 1, 2, 2), noise_std=1.0)
     assert float(loss) > 0.0
+
+
+def test_per_channel_input_noise_only_perturbs_chosen_channels():
+    from src.models.stepper import StateStepper
+    from src.pipelines.dgsw2l_baseline import has_noise, parse_noise_std
+
+    class Zero(torch.nn.Module):
+        def forward(self, x):
+            return torch.zeros_like(x[:, :6])
+
+    assert parse_noise_std(0.5, torch.device("cpu")) == 0.5 and has_noise(0.5) and not has_noise(0.0)
+    per_channel = parse_noise_std([1, 0, 0, 0, 0, 0], torch.device("cpu"))
+    assert per_channel.shape == (1, 6, 1, 1) and has_noise(per_channel)
+    stepper = StateStepper(Zero(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="residual")
+    states = torch.zeros(1, 2, 6, 3, 3)
+    torch.manual_seed(0)
+    # Only h0 is perturbed, and the zero-increment model carries it to the target error.
+    loss = unrolled_loss(stepper, states, torch.zeros(1, 1, 3, 3), per_channel)
+    torch.manual_seed(0)
+    full = unrolled_loss(stepper, states, torch.zeros(1, 1, 3, 3), 1.0)
+    assert 0 < float(loss) < float(full)
+    torch.manual_seed(0)
+    assert float(unrolled_crps_loss(stepper, states, torch.zeros(1, 1, 3, 3), per_channel)) > 0
+
+
+def test_run_experiment_accepts_per_channel_noise(tmp_path):
+    config = write_config(tmp_path)
+    config.raw["training"]["input_noise_std"] = [1.0, 0.5, 1.0, 0.5, 1.0, 0.5]
+    run_experiment(config, smoke_test=True)
+    assert json.loads(config.experiment_log.read_text())["metadata"]["input_noise_std"] == [1.0, 0.5, 1.0, 0.5, 1.0, 0.5]

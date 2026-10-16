@@ -144,7 +144,22 @@ def build_stepper(model_cfg: dict[str, Any], inputs: np.ndarray, state: np.ndarr
     )
 
 
-def unrolled_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tensor, noise_std: float = 0.0) -> torch.Tensor:
+NoiseStd = float | torch.Tensor
+
+
+def has_noise(noise_std: NoiseStd) -> bool:
+    return bool(torch.as_tensor(noise_std).gt(0).any())
+
+
+def parse_noise_std(value: Any, device: torch.device) -> NoiseStd:
+    """``input_noise_std`` as a float, or a per-channel list broadcast over ``(batch, channel, y, x)``."""
+
+    if isinstance(value, (list, tuple)):
+        return torch.tensor([float(v) for v in value], device=device).view(1, -1, 1, 1)
+    return float(value)
+
+
+def unrolled_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tensor, noise_std: NoiseStd = 0.0) -> torch.Tensor:
     """Mean over unrolled steps of the MSE in output-normalised units.
 
     ``noise_std`` > 0 perturbs the window's start state with white noise of
@@ -153,7 +168,7 @@ def unrolled_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tens
     """
 
     current = states[:, 0]
-    if noise_std > 0:
+    if has_noise(noise_std):
         noise = torch.randn_like(current) * stepper.output_std * noise_std
         if stepper.fixed_mask.numel():
             noise = noise.masked_fill(stepper.fixed_mask, 0.0)
@@ -166,7 +181,7 @@ def unrolled_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tens
     return loss / steps
 
 
-def unrolled_crps_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tensor, noise_std: float = 0.0) -> torch.Tensor:
+def unrolled_crps_loss(stepper: StateStepper, states: torch.Tensor, winds: torch.Tensor, noise_std: NoiseStd = 0.0) -> torch.Tensor:
     """Fair CRPS of a two-member ensemble, averaged over unrolled steps.
 
     Each window is rolled out twice with independent stochastic inputs (and
@@ -179,7 +194,7 @@ def unrolled_crps_loss(stepper: StateStepper, states: torch.Tensor, winds: torch
     batch = states.shape[0]
     pair_states = states.repeat(2, 1, 1, 1, 1)
     current = pair_states[:, 0]
-    if noise_std > 0:
+    if has_noise(noise_std):
         noise = torch.randn_like(current) * stepper.output_std * noise_std
         if stepper.fixed_mask.numel():
             noise = noise.masked_fill(stepper.fixed_mask, 0.0)
@@ -202,7 +217,7 @@ def train_one_epoch(
     optimiser: torch.optim.Optimizer,
     device: torch.device,
     gradient_clip_norm: float | None = None,
-    noise_std: float = 0.0,
+    noise_std: NoiseStd = 0.0,
     ema: AveragedModel | None = None,
     loss_name: str = "mse",
 ) -> float:
@@ -295,7 +310,8 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     forcing = inputs[:, STATE_CHANNELS]
     train_indices, eval_indices = dgsw2l_pair_split(len(state), config.train_fraction)
     unroll_steps = int(config.raw.get("training", {}).get("unroll_steps", 1))
-    noise_std = float(config.raw.get("training", {}).get("input_noise_std", 0.0))
+    noise_cfg = config.raw.get("training", {}).get("input_noise_std", 0.0)
+    noise_std = parse_noise_std(noise_cfg, device)
     loss_name = str(config.raw.get("training", {}).get("loss", "mse"))
     if loss_name not in {"mse", "crps"}:
         raise ValueError(f"unknown training loss {loss_name!r}")
@@ -327,7 +343,7 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
             "mass_conserving": stepper.mass_conserving,
             "unroll_steps": unroll_steps,
             "ema_decay": config.raw.get("training", {}).get("ema_decay"),
-            "input_noise_std": noise_std,
+            "input_noise_std": noise_cfg,
             "training_loss": loss_name,
             "stochastic_channels": stepper.stochastic_channels,
             "increment_smoothing": float(model_cfg.get("increment_smoothing", 0.0)),
