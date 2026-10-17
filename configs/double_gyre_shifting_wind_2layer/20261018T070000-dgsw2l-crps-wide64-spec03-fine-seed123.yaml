@@ -1,6 +1,11 @@
 experiment:
   acronym: dgsw2l
-  conclusion: null
+  conclusion: 'Seed replica of 20261018T070000-dgsw2l-crps-wide64-spec03-fine. 3-seed result
+    (42/7/123): realism 0.575 (best 3-seed realism; incumbent 0.684, always-on spec03 0.612),
+    noise excess 0.84, drift 0.014, at predictable-range MSE 17.8 (incumbent 15.4), epochs
+    30-60 MSE 150 (140), final 161 (149). Fails the strict promotion rule (benchmark ~+10,
+    beyond seed noise) like spec03, but dominates spec03 on realism at equal benchmark cost:
+    the best realism-for-skill trade-off found, flagged to the user rather than promoted.'
   family: double_gyre_shifting_wind_2layer
   hypothesis: 'A fine-scale-only spectral term (|k| >= 1/16) keeps predictable-range MSE within
     ~0.5 of the incumbent (seed 42: 15.8) while lowering noise excess and spectral error,
