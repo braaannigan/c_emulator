@@ -90,13 +90,25 @@ def gpu_memory_used(pod: Pod) -> int | None:
         return None
 
 
+POD_NAME = f"dgsw2l-queue-{time.strftime('%m%d%H%M%S')}"
+ANIMATE = """set -e
+command -v ffmpeg >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg >/dev/null)
+cd /root/c_emulator && mkdir -p data/double_gyre_shifting_wind_2layer
+ln -sfn {volume}/data/double_gyre_shifting_wind_2layer/train data/double_gyre_shifting_wind_2layer/train
+for mode in held-out long; do
+  PATH=/root/venv/bin:$PATH python scripts/animate_emulator.py --config {config} --checkpoint {volume}/outputs/{id}/{id}.pt \\
+    --mode $mode --long-years {years} --output {volume}/outputs/{id}/{id}-$mode-layer0.mp4
+done
+"""
+
+
 def create_pod(choices: list[str]) -> Pod:
     """Create a pod with the first available ``CLOUD:gpu-id`` choice, in order of preference."""
 
     for choice in choices:
         cloud, gpu = choice.split(":", 1)
         result = subprocess.run(
-            ["runpodctl", "pod", "create", "--image", IMAGE, "--gpu-id", gpu, "--cloud-type", cloud, "--name", "dgsw2l-queue",
+            ["runpodctl", "pod", "create", "--image", IMAGE, "--gpu-id", gpu, "--cloud-type", cloud, "--name", POD_NAME,
              "--container-disk-in-gb", "40", "--ports", "22/tcp", "--wait", "--wait-timeout", "6m"],
             capture_output=True, text=True,
         )
@@ -112,7 +124,7 @@ def create_pod(choices: list[str]) -> Pod:
         log(f"unavailable: {cloud} {gpu} ({message})")
         # A pod that was created but never became reachable over SSH still bills: delete it.
         for pod in json.loads(subprocess.run(["runpodctl", "pod", "list"], capture_output=True, text=True).stdout or "[]"):
-            if pod.get("name") == "dgsw2l-queue":
+            if pod.get("name") == POD_NAME:
                 subprocess.run(["runpodctl", "pod", "delete", pod["id"]], capture_output=True)
                 log(f"deleted unreachable pod {pod['id']}")
     raise RuntimeError("no GPU available from the preference list")
@@ -150,6 +162,10 @@ def record(outputs: Path, checkpoints: bool) -> None:
             continue
         for path in record_outputs(output, ROOT, FAMILY / "results.csv"):
             log(f"wrote {path}")
+        for movie in sorted(result_path.parent.glob("*.mp4")):
+            (ROOT / "figs").mkdir(exist_ok=True)
+            movie.replace(ROOT / "figs" / movie.name)
+            log(f"wrote figs/{movie.name}")
         checkpoint = result_path.parent / f"{name}.pt"
         if checkpoints and checkpoint.exists():
             (FAMILY / "checkpoints").mkdir(parents=True, exist_ok=True)
@@ -168,6 +184,7 @@ def main() -> None:
     parser.add_argument("--gpu", action="append", default=None, help="CLOUD:gpu-id in preference order (repeatable); default: cheap community cards first")
     parser.add_argument("--poll-seconds", type=float, default=60.0)
     parser.add_argument("--timeout-hours", type=float, default=6.0)
+    parser.add_argument("--animate", action="store_true", help="Render held-out and long-run MP4s on the pod into figs/")
     parser.add_argument("--keep", action="store_true", help="Do not delete the pod at the end")
     parser.add_argument("--output-root", type=Path, default=ROOT, help="Repository root whose data/ receives the results")
     args = parser.parse_args()
@@ -198,7 +215,16 @@ def main() -> None:
             if time.time() > deadline:
                 raise TimeoutError("queue did not finish in time")
             time.sleep(args.poll_seconds)
-        log("queue finished; fetching outputs")
+        log("queue finished")
+        if args.animate:
+            import yaml
+
+            for job in jobs:
+                experiment_id = yaml.safe_load((Path(__file__).resolve().parents[1] / job["config"]).read_text())["experiment"]["id"]
+                log(f"animating {experiment_id}")
+                if pod.ssh(ANIMATE.format(volume=REMOTE_VOLUME, config=job["config"], id=experiment_id, years=args.long_years), check=False).returncode:
+                    log(f"animation of {experiment_id} failed")
+        log("fetching outputs")
         with tempfile.TemporaryDirectory() as tmp:
             fetch_outputs(pod, Path(tmp), args.checkpoints)
             record(Path(tmp) / "outputs", args.checkpoints)
