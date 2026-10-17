@@ -11,7 +11,10 @@ experiment:
   hypothesis: 'A 64-channel U-Net lowers seed-42 predictable-range MSE below ~14.5 (48-channel
     seed 42: 15.1) while keeping realism <= ~0.75, drift <= ~0.1 and benchmark MSE within
     seed noise.'
-  conclusion: null
+  conclusion: 'Seed replica of 20261018T000000-dgsw2l-crps-coarse8-wide64. 3-seed result (42/7/123,
+    A5000 pod): predictable-range MSE 15.4 vs 16.4 for the 48-channel incumbent (4 seeds),
+    epochs 30-60 MSE 140 vs 149, final 149 vs 162, realism 0.684 vs 0.743, drift 0.018 vs
+    0.054. Better on every field, benchmark included: promoted to incumbent.'
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/

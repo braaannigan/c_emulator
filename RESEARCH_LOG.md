@@ -2,28 +2,35 @@
 
 ## Current incumbent
 
-`20261017T210000-dgsw2l-crps-coarse8-wide` (seeds 42, 7, 123: `-seed7`,
-`-seed123`; seed 11 pending).
+`20261018T000000-dgsw2l-crps-coarse8-wide64` (seeds 42, 7, 123: `-seed7`,
+`-seed123`).
 
-- Recipe: the 8x coarse-noise CRPS recipe with a 1.5x wider U-Net
-  (48/96/192/384 channels, ~4.4M params). Stochastic inputs: 4 noise
-  channels drawn on an 8x coarser grid and upsampled; two-member fair CRPS
-  over 8-step unrolls; land-aware Gaussian increment smoothing (sigma 1
-  cell); residual target; exact per-layer volume conservation over wet
-  cells; pinned land; static inputs (train-mean state, coordinates, land
-  mask); start-state noise 1 increment-std; EMA weights (0.998); Adam 3e-4,
-  batch 8, clip 1.0, 60 epochs. Needs ~10.7 GB GPU memory per run.
-- Three matched seeds vs the previous incumbent: predictable-range MSE 16.1
-  vs 18.2, epochs 30-60 eval_mse_mean 149.6 vs 153.4, final 163.3 vs 156.5
-  (within noise), realism 0.72 vs 0.70, long-run drift 0.05 vs 0.23.
-- Caveat: like all CRPS models so far it is effectively deterministic
-  (ensemble spread/error ~0.01); see the crps-shared-start experiments.
-- Checkpoint (seed 42): `data/double_gyre_shifting_wind_2layer/checkpoints/20261017T210000-dgsw2l-crps-coarse8-wide.pt`;
-  diagnostics `data/double_gyre_shifting_wind_2layer/diagnostics/<id>/`.
-  Full rollout NetCDF and animations pending (Mac GPU paused).
-- Experiments: hourly RunPod pod queue (`scripts/runpod_pod_queue.py`,
-  2 concurrent wide runs per 24 GB GPU) or the serverless endpoint
-  (`scripts/runpod_run.py`); compare with `scripts/scorecard_table.py`.
+- Recipe: the 8x coarse-noise CRPS recipe with a 2x wider U-Net
+  (64/128/256/512 channels). Stochastic inputs: 4 noise channels drawn on
+  an 8x coarser grid and upsampled; two-member fair CRPS over 8-step
+  unrolls; land-aware Gaussian increment smoothing (sigma 1 cell); residual
+  target; exact per-layer volume conservation over wet cells; pinned land;
+  static inputs (train-mean state, coordinates, land mask); start-state
+  noise 1 increment-std; EMA weights (0.998); Adam 3e-4, batch 8, clip 1.0,
+  60 epochs. Needs ~14 GB GPU memory per run (one 64-channel run plus one
+  32-channel run fit on a 24 GB card; two 64-channel runs do not).
+- 3 seeds vs the 48-channel incumbent (4 seeds): predictable-range MSE 15.4
+  vs 16.4, epochs 30-60 eval_mse_mean 140 vs 149, final 149 vs 162,
+  realism 0.684 vs 0.743, long-run drift 0.018 vs 0.054. Better on every
+  field.
+- Caveat: effectively deterministic like all CRPS models so far; the
+  calibrated-ensemble line is the crps-shared-start experiments.
+- Checkpoints stay on the RunPod volume (`outputs/<id>/<id>.pt`, fetch with
+  `scripts/runpod_fetch.py`); diagnostics in
+  `data/double_gyre_shifting_wind_2layer/diagnostics/<id>/`. Full rollout
+  NetCDF and animations pending (Mac GPU paused).
+- Experiments: hourly RunPod pod queue (`scripts/runpod_pod_queue.py`) or
+  the serverless endpoint (`scripts/runpod_run.py`); compare with
+  `scripts/scorecard_table.py`.
+
+Previous incumbent (48 channels): `20261017T210000-dgsw2l-crps-coarse8-wide`
+- 4-seed predictable-range MSE 16.4, epochs 30-60 149, final 162, realism
+0.743, drift 0.054.
 
 Previous incumbent (8x coarse noise, 32 channels):
 `20261017T160000-dgsw2l-crps-coarse-noise8` - 4-seed final 157.6, epochs
@@ -673,3 +680,18 @@ persistence). Track both MSE and variance/KE diagnostics.
 - Hypothesis: Smoothing sigma 1.5 removes the long-run drift of the shared-start model (finite upper-layer e-folding, drift score <= 0.15, no persistent western-boundary anomalies) while keeping spread/error within 0.6-1.3 and member realism <= ~0.95.
 - Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 276.5 / 448.9 / 0.008739 (std 0.99, KE 1.61); 10: 226 / 414.2 / 0.003648 (std 1.02, KE 0.69); 15: 199.7 / 372.6 / 0.002864 (std 1.02, KE 0.54); 20: 195.9 / 323.3 / 0.00255 (std 0.99, KE 0.58); 25: 194.4 / 366.9 / 0.002231 (std 0.99, KE 0.69); 30: 166.2 / 332.4 / 0.001672 (std 1.01, KE 0.80); 35: 144.4 / 311.1 / 0.001751 (std 1.00, KE 0.86); 40: 160.2 / 279.8 / 0.002201 (std 0.98, KE 0.89); 45: 160.1 / 350.8 / 0.00219 (std 0.99, KE 0.92); 50: 132 / 260.1 / 0.001832 (std 1.00, KE 0.93); 55: 159.7 / 437 / 0.002162 (std 0.98, KE 0.94); 60: 123.3 / 295.9 / 0.001861 (std 0.98, KE 0.93)
 - Conclusion: Mislabelled run: it was launched from main, which did not yet have crps_shared_start_noise, so the flag was ignored. What actually ran: the 32-channel coarse-noise-8 CRPS model with smoothing sigma 1.5 and independent per-member start noise of 0.5 (vs 1.0 in the old incumbent). Result (seed 42): best realism so far, 0.657, with noise excess 0.70 decades and drift 0.032; final MSE 123 (lowest single final) and 30-60 MSE 149; but predictable-range MSE is 20.9 (32-ch coarse8 4 seeds: 17.5), so the extra smoothing costs short-range skill. The shared-start code is now merged to main; the genuine shared-start + sigma 1.5 test is re-queued as 20261018T020000-dgsw2l-crps-shared-smooth15b.
+
+### 20261018T000000-dgsw2l-crps-coarse8-wide64-seed7 — tuning
+- Hypothesis: A 64-channel U-Net lowers seed-42 predictable-range MSE below ~14.5 (48-channel seed 42: 15.1) while keeping realism <= ~0.75, drift <= ~0.1 and benchmark MSE within seed noise.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 233.5 / 300.6 / 0.003866 (std 0.89, KE 0.75); 10: 190.4 / 269.8 / 0.002569 (std 0.90, KE 0.53); 15: 179.6 / 290.1 / 0.002331 (std 0.94, KE 0.58); 20: 188.2 / 286.4 / 0.002324 (std 1.00, KE 0.76); 25: 175.3 / 272.6 / 0.002232 (std 1.00, KE 0.83); 30: 136.8 / 222.6 / 0.001682 (std 0.99, KE 0.87); 35: 151.2 / 170.6 / 0.001817 (std 0.99, KE 0.90); 40: 136 / 328.3 / 0.001883 (std 1.00, KE 0.92); 45: 137.5 / 402.2 / 0.001962 (std 1.00, KE 0.93); 50: 142.1 / 408.6 / 0.002063 (std 0.99, KE 0.94); 55: 139.3 / 427.2 / 0.002121 (std 0.99, KE 0.94); 60: 146.7 / 432.4 / 0.00225 (std 0.98, KE 0.95)
+- Conclusion: Seed replica of 20261018T000000-dgsw2l-crps-coarse8-wide64. 3-seed result (42/7/123, A5000 pod): predictable-range MSE 15.4 vs 16.4 for the 48-channel incumbent (4 seeds), epochs 30-60 MSE 140 vs 149, final 149 vs 162, realism 0.684 vs 0.743, drift 0.018 vs 0.054. Better on every field, benchmark included: promoted to incumbent.
+
+### 20261018T000000-dgsw2l-crps-coarse8-wide64-seed123 — tuning
+- Hypothesis: A 64-channel U-Net lowers seed-42 predictable-range MSE below ~14.5 (48-channel seed 42: 15.1) while keeping realism <= ~0.75, drift <= ~0.1 and benchmark MSE within seed noise.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 242.3 / 331.3 / 0.004417 (std 0.92, KE 0.78); 10: 185.4 / 272.3 / 0.00279 (std 0.92, KE 0.43); 15: 168.5 / 271.4 / 0.002518 (std 0.95, KE 0.43); 20: 177.2 / 289.6 / 0.002355 (std 1.01, KE 0.65); 25: 156.9 / 311.6 / 0.001965 (std 1.03, KE 0.81); 30: 125.6 / 180.9 / 0.001505 (std 1.01, KE 0.87); 35: 129.5 / 306.5 / 0.00165 (std 1.00, KE 0.90); 40: 139.1 / 359.6 / 0.001972 (std 1.00, KE 0.93); 45: 152.3 / 518.8 / 0.002391 (std 0.99, KE 0.94); 50: 132.9 / 440.5 / 0.002118 (std 1.00, KE 0.95); 55: 140.8 / 459.9 / 0.002319 (std 0.99, KE 0.95); 60: 144.8 / 422.5 / 0.002337 (std 0.99, KE 0.95)
+- Conclusion: Seed replica of 20261018T000000-dgsw2l-crps-coarse8-wide64. 3-seed result (42/7/123, A5000 pod): predictable-range MSE 15.4 vs 16.4 for the 48-channel incumbent (4 seeds), epochs 30-60 MSE 140 vs 149, final 149 vs 162, realism 0.684 vs 0.743, drift 0.018 vs 0.054. Better on every field, benchmark included: promoted to incumbent.
+
+### 20261018T020000-dgsw2l-crps-shared-smooth15b — medium_step
+- Hypothesis: Smoothing sigma 1.5 removes the long-run drift of the shared-start model (finite upper-layer e-folding, drift score <= 0.15, no persistent western-boundary anomalies) while keeping spread/error within 0.6-1.3 and member realism <= ~0.95.
+- Rollouts (epoch: mean / last / vel (h-std ratio, KE ratio)): 5: 275 / 406 / 0.009934 (std 0.94, KE 1.92); 10: 221.8 / 328.4 / 0.00384 (std 0.95, KE 0.84); 15: 182.6 / 272.8 / 0.002756 (std 0.92, KE 0.62); 20: 208.4 / 366.6 / 0.002771 (std 0.95, KE 0.67); 25: 236.5 / 297.6 / 0.002681 (std 0.97, KE 0.78); 30: 185.6 / 258.1 / 0.002364 (std 0.99, KE 0.85); 35: 182.8 / 415 / 0.001957 (std 0.99, KE 0.90); 40: 201.8 / 396.7 / 0.002766 (std 0.99, KE 0.93); 45: 149.9 / 271 / 0.002035 (std 0.98, KE 0.96); 50: 175.1 / 173.9 / 0.001947 (std 1.00, KE 0.95); 55: 181.4 / 387.6 / 0.002423 (std 0.98, KE 0.95); 60: 130.7 / 262.1 / 0.001813 (std 0.98, KE 0.97)
+- Conclusion: Not promoted; partial success. With the shared-start code actually active, smoothing sigma 1.5 halves the shared-start model's long-run drift (0.079 vs 0.158 at sigma 1.0) and improves member realism (0.712 vs 0.986, noise excess 0.89 vs 1.6 decades); the 25-year run stays finite. Final MSE 131 (an ensemble-like, smoother tail), but epochs 30-60 MSE 172 and predictable-range member MSE 29 stay far worse than the incumbent (15.4). The spread check was not run (the pod job does not pass --members), so calibration is unverified. The calibrated-ensemble line remains a realism/UQ option, not a skill improvement.

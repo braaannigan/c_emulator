@@ -16,7 +16,13 @@ experiment:
   hypothesis: Smoothing sigma 1.5 removes the long-run drift of the shared-start model (finite
     upper-layer e-folding, drift score <= 0.15, no persistent western-boundary anomalies)
     while keeping spread/error within 0.6-1.3 and member realism <= ~0.95.
-  conclusion: null
+  conclusion: Not promoted; partial success. With the shared-start code actually active, smoothing
+    sigma 1.5 halves the shared-start model's long-run drift (0.079 vs 0.158 at sigma 1.0)
+    and improves member realism (0.712 vs 0.986, noise excess 0.89 vs 1.6 decades); the 25-year
+    run stays finite. Final MSE 131 (an ensemble-like, smoother tail), but epochs 30-60 MSE
+    172 and predictable-range member MSE 29 stay far worse than the incumbent (15.4). The
+    spread check was not run (the pod job does not pass --members), so calibration is unverified.
+    The calibrated-ensemble line remains a realism/UQ option, not a skill improvement.
 paths:
   training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
   rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
