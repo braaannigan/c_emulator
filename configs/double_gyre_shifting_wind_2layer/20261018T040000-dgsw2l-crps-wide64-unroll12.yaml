@@ -1,6 +1,10 @@
 experiment:
   acronym: dgsw2l
-  conclusion: null
+  conclusion: 'Rejected. 12-step unrolls on the 64-channel incumbent (seed 42) worsen predictable-range
+    MSE (19.4 over epochs 30-60 vs 15.8; rising from 17.8 at epoch 40) and epochs 30-60 MSE
+    (149 vs 141); final 151 (155) and realism 0.666 (0.682), drift 0.013 (0.003) are within
+    noise. Consistent with the 32-channel CRPS unroll-12 result: longer unrolls do not help
+    the CRPS recipe.'
   family: double_gyre_shifting_wind_2layer
   hypothesis: '12-step CRPS unrolls on the 64-channel incumbent lower predictable-range MSE
     (3-seed 15.4) or realism/drift without worsening epochs 30-60 MSE beyond seed noise (seed

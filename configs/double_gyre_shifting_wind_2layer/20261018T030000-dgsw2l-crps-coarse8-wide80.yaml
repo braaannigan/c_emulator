@@ -1,6 +1,10 @@
 experiment:
   acronym: dgsw2l
-  conclusion: null
+  conclusion: 'Not promoted; width saturates at 64. Seed 42 (A6000 pod): predictable-range
+    MSE 17.0 over epochs 30-60 vs 15.8 for the 64-channel seed 42, and it rises late in training
+    (15.2 at epoch 40 -> 17.8 at 60, i.e. over-fitting appears at 80 channels); epochs 30-60
+    MSE 145 (64-ch seed 42: 141), final 160 (155). Realism is the best single value so far
+    (0.641 vs 0.682) and drift 0.009, but the skill loss outweighs it.'
   family: double_gyre_shifting_wind_2layer
   hypothesis: 'An 80-channel U-Net lowers seed-42 predictable-range MSE below ~15 (64-channel
     seed 42: 15.8; 3-seed 15.4) with realism <= ~0.7, drift <= ~0.05 and benchmark MSE within
