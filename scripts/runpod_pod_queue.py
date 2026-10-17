@@ -77,6 +77,19 @@ DEFAULT_GPUS = [
 ]
 
 
+MAX_FOREIGN_GPU_MIB = 1024
+
+
+def gpu_memory_used(pod: Pod) -> int | None:
+    """GPU memory already in use on a fresh pod; some hosts hand out a GPU another process is filling."""
+
+    result = pod.ssh("nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits", check=False, capture=True)
+    try:
+        return int(result.stdout.split()[0])
+    except (IndexError, ValueError):
+        return None
+
+
 def create_pod(choices: list[str]) -> Pod:
     """Create a pod with the first available ``CLOUD:gpu-id`` choice, in order of preference."""
 
@@ -88,9 +101,14 @@ def create_pod(choices: list[str]) -> Pod:
             capture_output=True, text=True,
         )
         if result.returncode == 0:
-            log(f"got {cloud} {gpu}")
-            return Pod(json.loads(result.stdout))
-        message = (result.stdout.strip() or result.stderr.strip())[:200]
+            pod = Pod(json.loads(result.stdout))
+            used = gpu_memory_used(pod)
+            if used is not None and used < MAX_FOREIGN_GPU_MIB:
+                log(f"got {cloud} {gpu}")
+                return pod
+            message = f"GPU already holds {used} MiB (busy or broken host)"
+        else:
+            message = (result.stdout.strip() or result.stderr.strip())[:200]
         log(f"unavailable: {cloud} {gpu} ({message})")
         # A pod that was created but never became reachable over SSH still bills: delete it.
         for pod in json.loads(subprocess.run(["runpodctl", "pod", "list"], capture_output=True, text=True).stdout or "[]"):
