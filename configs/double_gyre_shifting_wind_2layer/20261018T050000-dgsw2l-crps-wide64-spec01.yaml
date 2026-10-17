@@ -1,6 +1,9 @@
 experiment:
   acronym: dgsw2l
-  conclusion: null
+  conclusion: 'Not promoted (weight too small to matter). Seed 42: realism 0.655 (incumbent
+    seed 42 0.682; spectral error 0.208 vs 0.221, noise excess 0.90 vs 0.96 decades, EKE amplitude
+    error 0.18 vs 0.19) but predictable-range MSE 16.9 (15.8) and epochs 30-60 MSE 157 (141).
+    The realism gain is small; weight 0.3 does better.'
   family: double_gyre_shifting_wind_2layer
   hypothesis: 'A spectral loss weight of 0.1 lowers seed-42 realism below ~0.62 (incumbent
     seed 42: 0.682) and the noise excess below ~0.8 decades, without raising predictable-range

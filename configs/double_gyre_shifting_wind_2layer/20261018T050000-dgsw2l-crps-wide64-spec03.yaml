@@ -1,6 +1,12 @@
 experiment:
   acronym: dgsw2l
-  conclusion: null
+  conclusion: 'Promising realism trade-off; seed check queued. Seed 42: realism 0.573 over
+    epochs 30-60 (incumbent seed 42 0.682; held-out diagnostics 0.556 vs 0.704: spectral error
+    0.175 vs 0.221, noise excess 0.81 vs 0.96 decades, EKE amplitude error 0.136 vs 0.193,
+    pattern 0.042 vs 0.051), every realism component better, drift 0.003. Cost: predictable-range
+    MSE 17.7 (+12%), epochs 30-60 MSE 153 (+12), final 160 (+5) -- the kind of realism-for-skill
+    trade-off the user has accepted before (~10%), to be confirmed over seeds 7 and 123. Weight
+    1.0 queued alongside to map the trend.'
   family: double_gyre_shifting_wind_2layer
   hypothesis: 'A spectral loss weight of 0.3 lowers seed-42 realism below ~0.62 (incumbent
     seed 42: 0.682) and the noise excess below ~0.8 decades, without raising predictable-range
