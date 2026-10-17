@@ -1,6 +1,10 @@
 experiment:
   acronym: dgsw2l
-  conclusion: null
+  conclusion: 'Not promoted; past the useful range. Weight 1.0 (seed 42) gives the best realism
+    so far, 0.484 (weight 0.3: 0.573, 0.1: 0.655, 0: 0.682 on seed 42), with drift 0.002,
+    but predictable-range MSE 18.7 and epochs 30-60 MSE 167 / final 170 (incumbent seed 42:
+    15.8 / 141 / 155). The spectral weight trades skill for realism roughly linearly; next
+    try to keep realism while recovering skill (curriculum and fine-scale-only variants).'
   family: double_gyre_shifting_wind_2layer
   hypothesis: Spectral weight 1.0 lowers seed-42 realism further (below ~0.5) with predictable-range
     MSE below ~20; if skill collapses, 0.3 is near the useful maximum.

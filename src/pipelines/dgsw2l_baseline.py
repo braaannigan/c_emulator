@@ -188,10 +188,20 @@ def log_spectrum(fields: torch.Tensor) -> torch.Tensor:
     return torch.log(power + 1e-6)
 
 
-def spectral_loss(prediction: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-    """Mean absolute log-power mismatch: penalises missing or excess energy at each scale, not phase errors."""
+def spectral_loss(prediction: torch.Tensor, target: torch.Tensor, min_wavenumber: float = 0.0) -> torch.Tensor:
+    """Mean absolute log-power mismatch: penalises missing or excess energy at each scale, not phase errors.
 
-    return (log_spectrum(prediction) - log_spectrum(target)).abs().mean()
+    ``min_wavenumber`` (cycles per cell) restricts the penalty to scales finer
+    than ``1 / min_wavenumber`` cells.
+    """
+
+    mismatch = (log_spectrum(prediction) - log_spectrum(target)).abs()
+    if min_wavenumber <= 0:
+        return mismatch.mean()
+    ky = torch.fft.fftfreq(prediction.shape[-2], device=prediction.device)
+    kx = torch.fft.rfftfreq(prediction.shape[-1], device=prediction.device)
+    keep = torch.sqrt(ky[:, None] ** 2 + kx[None, :] ** 2) >= min_wavenumber
+    return mismatch[..., keep].mean()
 
 
 def unrolled_crps_loss(
@@ -201,6 +211,7 @@ def unrolled_crps_loss(
     noise_std: NoiseStd = 0.0,
     shared_start_noise: bool = False,
     spectral_weight: float = 0.0,
+    spectral_min_wavenumber: float = 0.0,
 ) -> torch.Tensor:
     """Fair CRPS of a two-member ensemble, averaged over unrolled steps.
 
@@ -236,7 +247,7 @@ def unrolled_crps_loss(
         crps = 0.5 * ((first - target).abs() + (second - target).abs()) - 0.5 * (first - second).abs()
         loss = loss + crps.mean()
         if spectral_weight:
-            loss = loss + spectral_weight * 0.5 * (spectral_loss(first, target) + spectral_loss(second, target))
+            loss = loss + spectral_weight * 0.5 * (spectral_loss(first, target, spectral_min_wavenumber) + spectral_loss(second, target, spectral_min_wavenumber))
     return loss / steps
 
 
@@ -251,6 +262,7 @@ def train_one_epoch(
     loss_name: str = "mse",
     shared_start_noise: bool = False,
     spectral_weight: float = 0.0,
+    spectral_min_wavenumber: float = 0.0,
 ) -> float:
     stepper.train()
     losses: list[float] = []
@@ -259,7 +271,7 @@ def train_one_epoch(
         winds = winds.to(device)
         optimiser.zero_grad(set_to_none=True)
         if loss_name == "crps":
-            loss = unrolled_crps_loss(stepper, states, winds, noise_std, shared_start_noise, spectral_weight)
+            loss = unrolled_crps_loss(stepper, states, winds, noise_std, shared_start_noise, spectral_weight, spectral_min_wavenumber)
         else:
             loss = unrolled_loss(stepper, states, winds, noise_std)
         loss.backward()
@@ -349,6 +361,9 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     loss_name = str(config.raw.get("training", {}).get("loss", "mse"))
     shared_start_noise = bool(config.raw.get("training", {}).get("crps_shared_start_noise", False))
     spectral_weight = float(config.raw.get("training", {}).get("spectral_loss_weight", 0.0))
+    # Curriculum: no spectral term before this epoch (learn short-range skill first).
+    spectral_start_epoch = int(config.raw.get("training", {}).get("spectral_loss_start_epoch", 1))
+    spectral_min_wavenumber = float(config.raw.get("training", {}).get("spectral_loss_min_wavenumber", 0.0))
     if loss_name not in {"mse", "crps"}:
         raise ValueError(f"unknown training loss {loss_name!r}")
     dataset = RolloutWindowDataset(state, forcing, train_indices, unroll_steps)
@@ -383,6 +398,8 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
             "training_loss": loss_name,
             "crps_shared_start_noise": shared_start_noise,
             "spectral_loss_weight": spectral_weight,
+            "spectral_loss_start_epoch": spectral_start_epoch,
+            "spectral_loss_min_wavenumber": spectral_min_wavenumber,
             "stochastic_channels": stepper.stochastic_channels,
             "increment_smoothing": float(model_cfg.get("increment_smoothing", 0.0)),
             "stochastic_scale": stepper.stochastic_scale,
@@ -405,7 +422,10 @@ def run_experiment(config: ExperimentConfig, smoke_test: bool = False) -> dict[s
     emulator = StepperEmulator(eval_stepper, device)
     for epoch in range(1, epochs + 1):
         started = time.perf_counter()
-        loss = train_one_epoch(stepper, loader, optimiser, device, gradient_clip_norm=config.gradient_clip_norm, noise_std=noise_std, ema=ema, loss_name=loss_name, shared_start_noise=shared_start_noise, spectral_weight=spectral_weight)
+        loss = train_one_epoch(
+            stepper, loader, optimiser, device, gradient_clip_norm=config.gradient_clip_norm, noise_std=noise_std, ema=ema, loss_name=loss_name, shared_start_noise=shared_start_noise,
+            spectral_weight=spectral_weight if epoch >= spectral_start_epoch else 0.0, spectral_min_wavenumber=spectral_min_wavenumber,
+        )
         elapsed = time.perf_counter() - started
         log["epochs"].append(
             {

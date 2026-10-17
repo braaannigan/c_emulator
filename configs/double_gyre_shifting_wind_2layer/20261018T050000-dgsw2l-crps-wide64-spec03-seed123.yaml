@@ -1,6 +1,11 @@
 experiment:
   acronym: dgsw2l
-  conclusion: null
+  conclusion: 'Seed replica of 20261018T050000-dgsw2l-crps-wide64-spec03. 3-seed result (42/7/123)
+    vs the 64-channel incumbent (3 seeds): realism 0.597 vs 0.684 (-13%), noise excess 0.85
+    vs 1.04 decades, drift 0.015 vs 0.018, but predictable-range MSE 17.6 vs 15.4 (+14%),
+    epochs 30-60 MSE 151 vs 140 (+11, beyond the ~5 seed noise) and final 162 vs 149 (+13).
+    Clear realism gain at a clear skill cost: fails the strict promotion rule; flagged to
+    the user as a realism-for-skill trade-off (they accepted ~10% before) rather than rejected.'
   family: double_gyre_shifting_wind_2layer
   hypothesis: 'A spectral loss weight of 0.3 lowers seed-42 realism below ~0.62 (incumbent
     seed 42: 0.682) and the noise excess below ~0.8 decades, without raising predictable-range

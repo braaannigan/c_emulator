@@ -415,3 +415,21 @@ def test_run_experiment_logs_spectral_weight(tmp_path):
     config.raw["training"].update({"loss": "crps", "spectral_loss_weight": 0.1})
     run_experiment(config, smoke_test=True)
     assert json.loads(config.experiment_log.read_text())["metadata"]["spectral_loss_weight"] == 0.1
+
+
+def test_spectral_loss_min_wavenumber_ignores_large_scales():
+    torch.manual_seed(0)
+    field = torch.randn(4, 1, 16, 16)
+    smooth = torch.ones(4, 1, 16, 16) * 3.0
+    # Only the mean (k = 0) differs: invisible above a positive cutoff.
+    assert float(spectral_loss(field + smooth, field, min_wavenumber=0.1)) < 1e-4
+    assert float(spectral_loss(field + smooth, field)) > 0.0
+
+
+def test_run_experiment_spectral_curriculum(tmp_path):
+    config = write_config(tmp_path)
+    config.raw["model"].update({"target_mode": "residual", "stochastic_channels": 1})
+    config.raw["training"].update({"loss": "crps", "spectral_loss_weight": 0.3, "spectral_loss_start_epoch": 2, "spectral_loss_min_wavenumber": 0.1})
+    run_experiment(config, smoke_test=True)
+    metadata = json.loads(config.experiment_log.read_text())["metadata"]
+    assert metadata["spectral_loss_start_epoch"] == 2 and metadata["spectral_loss_min_wavenumber"] == 0.1
