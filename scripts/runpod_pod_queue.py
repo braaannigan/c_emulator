@@ -37,7 +37,7 @@ KEY = Path.home() / ".runpod" / "ssh" / "runpodctl-ssh-key"
 IMAGE = "runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404"
 SETUP = """set -e
 python -m venv --system-site-packages /root/venv
-/root/venv/bin/pip install --quiet --no-cache-dir runpod xarray netcdf4 pyyaml scipy matplotlib
+/root/venv/bin/pip install --quiet --no-cache-dir runpod xarray netcdf4 pyyaml scipy matplotlib imageio imageio-ffmpeg
 rm -rf /root/c_emulator && git clone --quiet --depth 1 https://github.com/braaannigan/c_emulator.git /root/c_emulator
 rm -rf {volume}/DONE {volume}/outputs/job[0-9]*
 mkdir -p {volume}/data/double_gyre_shifting_wind_2layer/train /root/chunks
@@ -92,7 +92,6 @@ def gpu_memory_used(pod: Pod) -> int | None:
 
 POD_NAME = f"dgsw2l-queue-{time.strftime('%m%d%H%M%S')}"
 ANIMATE = """set -e
-command -v ffmpeg >/dev/null || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg >/dev/null)
 cd /root/c_emulator && mkdir -p data/double_gyre_shifting_wind_2layer
 ln -sfn {volume}/data/double_gyre_shifting_wind_2layer/train data/double_gyre_shifting_wind_2layer/train
 for mode in held-out long; do
