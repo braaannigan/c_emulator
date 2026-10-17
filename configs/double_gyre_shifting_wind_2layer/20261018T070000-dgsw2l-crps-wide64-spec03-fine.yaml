@@ -1,6 +1,10 @@
 experiment:
   acronym: dgsw2l
-  conclusion: null
+  conclusion: 'Promising; seed check queued. Seed 42: restricting the spectral term to wavelengths
+    < 16 cells gives the best spec03 realism, 0.557 (always-on full-band 0.573, incumbent
+    seed 42 0.682; noise excess 0.81), with predictable-range MSE 16.9 (17.7 / 15.8), epochs
+    30-60 MSE 147 (153 / 141), final 158 (160 / 155), drift 0.008. Less skill recovered than
+    the curriculum variant; the two could be combined.'
   family: double_gyre_shifting_wind_2layer
   hypothesis: 'A fine-scale-only spectral term (|k| >= 1/16) keeps predictable-range MSE within
     ~0.5 of the incumbent (seed 42: 15.8) while lowering noise excess and spectral error,

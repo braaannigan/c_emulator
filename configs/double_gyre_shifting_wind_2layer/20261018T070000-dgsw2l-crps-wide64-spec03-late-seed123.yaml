@@ -1,0 +1,72 @@
+experiment:
+  acronym: dgsw2l
+  conclusion: null
+  family: double_gyre_shifting_wind_2layer
+  hypothesis: Turning the spectral term on at epoch 21 keeps seed-42 realism within ~0.03
+    of always-on spec03 (0.573) while recovering predictable-range MSE to below ~16.5 (spec03
+    17.7, incumbent 15.8).
+  id: 20261018T070000-dgsw2l-crps-wide64-spec03-late-seed123
+  kind: tuning
+  rationale: Spectral weight 0.3 improves realism 13% but costs 14% predictable-range MSE
+    over 3 seeds. A curriculum (no spectral term for epochs 1-20, weight 0.3 from epoch 21)
+    lets the model first learn short-range dynamics under pure CRPS, then adds the scale-by-scale
+    energy constraint as a fine-tuning objective, which may keep more of the skill.
+  summary: crps-wide64-spec03-late
+inputs:
+  conditioning_fields:
+  - surface_wind_stress
+  layers: 2
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+metrics:
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '
+  primary: eval_mse_mean
+model:
+  depth: 3
+  fixed_land_cells: true
+  hidden_channels: 64
+  increment_smoothing: 1.0
+  loss: mse
+  mass_conserving: true
+  stochastic_channels: 4
+  stochastic_scale: 8
+  target_mode: residual
+  type: unet
+paths:
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261018T070000-dgsw2l-crps-wide64-spec03-late-seed123.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+rollout:
+  autoregressive: true
+  eval_interval_epochs: 5
+  save_outputs: false
+  steps: null
+runtime:
+  device: auto
+  epochs: 60
+  seed: 123
+  smoke_test_epochs: 1
+split:
+  eval_fraction: 0.2
+  method: chronological
+  train_fraction: 0.8
+training:
+  batch_size: 8
+  ema_decay: 0.998
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+  learning_rate: 0.0003
+  loss: crps
+  spectral_loss_start_epoch: 21
+  spectral_loss_weight: 0.3
+  unroll_steps: 8
