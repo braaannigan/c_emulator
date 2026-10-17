@@ -1,0 +1,69 @@
+experiment:
+  acronym: dgsw2l
+  conclusion: null
+  family: double_gyre_shifting_wind_2layer
+  hypothesis: 'An 80-channel U-Net lowers seed-42 predictable-range MSE below ~15 (64-channel
+    seed 42: 15.8; 3-seed 15.4) with realism <= ~0.7, drift <= ~0.05 and benchmark MSE within
+    seed noise.'
+  id: 20261018T030000-dgsw2l-crps-coarse8-wide80
+  kind: tuning
+  rationale: Width has helped at every step (32 -> 48 -> 64 channels improved predictable-range
+    MSE 17.5 -> 16.4 -> 15.4, realism and drift, with no over-fitting under CRPS). 80 channels
+    tests whether the trend continues; 96 would not fit beside a second job on a 48 GB card.
+  summary: crps-coarse8-wide80
+inputs:
+  conditioning_fields:
+  - surface_wind_stress
+  layers: 2
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+metrics:
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '
+  primary: eval_mse_mean
+model:
+  depth: 3
+  fixed_land_cells: true
+  hidden_channels: 80
+  increment_smoothing: 1.0
+  loss: mse
+  mass_conserving: true
+  stochastic_channels: 4
+  stochastic_scale: 8
+  target_mode: residual
+  type: unet
+paths:
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261018T030000-dgsw2l-crps-coarse8-wide80.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+rollout:
+  autoregressive: true
+  eval_interval_epochs: 5
+  save_outputs: false
+  steps: null
+runtime:
+  device: auto
+  epochs: 60
+  seed: 42
+  smoke_test_epochs: 1
+split:
+  eval_fraction: 0.2
+  method: chronological
+  train_fraction: 0.8
+training:
+  batch_size: 8
+  ema_decay: 0.998
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+  learning_rate: 0.0003
+  loss: crps
+  unroll_steps: 8

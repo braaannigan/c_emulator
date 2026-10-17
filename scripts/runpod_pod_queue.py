@@ -39,6 +39,7 @@ SETUP = """set -e
 python -m venv --system-site-packages /root/venv
 /root/venv/bin/pip install --quiet --no-cache-dir runpod xarray netcdf4 pyyaml scipy matplotlib
 rm -rf /root/c_emulator && git clone --quiet --depth 1 https://github.com/braaannigan/c_emulator.git /root/c_emulator
+rm -rf {volume}/DONE {volume}/outputs/job[0-9]*
 mkdir -p {volume}/data/double_gyre_shifting_wind_2layer/train /root/chunks
 """
 

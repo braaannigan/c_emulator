@@ -1,0 +1,70 @@
+experiment:
+  acronym: dgsw2l
+  conclusion: null
+  family: double_gyre_shifting_wind_2layer
+  hypothesis: '12-step CRPS unrolls on the 64-channel incumbent lower predictable-range MSE
+    (3-seed 15.4) or realism/drift without worsening epochs 30-60 MSE beyond seed noise (seed
+    42: 141).'
+  id: 20261018T040000-dgsw2l-crps-wide64-unroll12
+  kind: medium_step
+  rationale: The incumbent trains with 8-step unrolls, but skill lasts ~26 steps and drift/realism
+    are judged on multi-year free runs. Training on 12-step unrolls exposes the model to more
+    of its own error growth, which should reduce drift and improve mid-range skill; 32-channel
+    MSE-era horizon tests were mixed but predate CRPS, smoothing and EMA.
+  summary: crps-wide64-unroll12
+inputs:
+  conditioning_fields:
+  - surface_wind_stress
+  layers: 2
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+metrics:
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '
+  primary: eval_mse_mean
+model:
+  depth: 3
+  fixed_land_cells: true
+  hidden_channels: 64
+  increment_smoothing: 1.0
+  loss: mse
+  mass_conserving: true
+  stochastic_channels: 4
+  stochastic_scale: 8
+  target_mode: residual
+  type: unet
+paths:
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261018T040000-dgsw2l-crps-wide64-unroll12.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+rollout:
+  autoregressive: true
+  eval_interval_epochs: 5
+  save_outputs: false
+  steps: null
+runtime:
+  device: auto
+  epochs: 60
+  seed: 42
+  smoke_test_epochs: 1
+split:
+  eval_fraction: 0.2
+  method: chronological
+  train_fraction: 0.8
+training:
+  batch_size: 8
+  ema_decay: 0.998
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+  learning_rate: 0.0003
+  loss: crps
+  unroll_steps: 12
