@@ -16,6 +16,7 @@ from src.pipelines.dgsw2l_baseline import (
     static_context,
     unrolled_loss,
     unrolled_crps_loss,
+    spectral_loss,
     current_learning_rate,
     decay_learning_rate,
     resolve_device,
@@ -382,3 +383,35 @@ def test_run_experiment_logs_shared_start_noise(tmp_path):
     config.raw["training"].update({"loss": "crps", "crps_shared_start_noise": True, "input_noise_std": 1.0})
     run_experiment(config, smoke_test=True)
     assert json.loads(config.experiment_log.read_text())["metadata"]["crps_shared_start_noise"] is True
+
+
+def test_spectral_loss_ignores_phase_but_sees_missing_energy():
+    torch.manual_seed(0)
+    field = torch.randn(4, 2, 8, 8)
+    shifted = torch.roll(field, shifts=3, dims=-1)
+    assert float(spectral_loss(shifted, field)) < 1e-4
+    assert float(spectral_loss(0.5 * field, field)) > 1.0
+
+
+def test_crps_loss_adds_spectral_term():
+    from src.models.stepper import StateStepper
+
+    class Half(torch.nn.Module):
+        def forward(self, x):
+            return 0.5 * x[:, :6]
+
+    stepper = StateStepper(Half(), np.zeros(7), np.ones(7), np.zeros(6), np.ones(6), target_mode="next_state")
+    torch.manual_seed(0)
+    states = torch.randn(2, 2, 6, 4, 4)
+    winds = torch.zeros(2, 1, 4, 4)
+    plain = float(unrolled_crps_loss(stepper, states, winds))
+    with_spectrum = float(unrolled_crps_loss(stepper, states, winds, spectral_weight=1.0))
+    assert with_spectrum > plain
+
+
+def test_run_experiment_logs_spectral_weight(tmp_path):
+    config = write_config(tmp_path)
+    config.raw["model"].update({"target_mode": "residual", "stochastic_channels": 1})
+    config.raw["training"].update({"loss": "crps", "spectral_loss_weight": 0.1})
+    run_experiment(config, smoke_test=True)
+    assert json.loads(config.experiment_log.read_text())["metadata"]["spectral_loss_weight"] == 0.1

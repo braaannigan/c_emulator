@@ -1,0 +1,74 @@
+experiment:
+  acronym: dgsw2l
+  conclusion: null
+  family: double_gyre_shifting_wind_2layer
+  hypothesis: 'A spectral loss weight of 0.3 lowers seed-42 realism below ~0.62 (incumbent
+    seed 42: 0.682) and the noise excess below ~0.8 decades, without raising predictable-range
+    MSE (15.8) or epochs 30-60 MSE (141) beyond seed noise.'
+  id: 20261018T050000-dgsw2l-crps-wide64-spec03
+  kind: medium_step
+  rationale: 'Realism is limited by scale-dependent energy errors: a grid-noise excess of
+    ~1 decade at the smallest scales and an upper-layer EKE amplitude deficit at eddy scales.
+    CRPS is a pointwise score and cannot see either. A batch-mean log-power-spectrum mismatch
+    term (per channel and 2-D wavenumber, phase-blind, so it does not reward smoothing) adds
+    a direct scale-by-scale energy constraint on every unrolled step. Two weights (0.1, 0.3)
+    on the 64-channel incumbent, seed 42, on one 48 GB pod. The unit tests cover the code
+    path; the local smoke run was skipped because the Mac GPU is paused.'
+  summary: crps-wide64-spec03
+inputs:
+  conditioning_fields:
+  - surface_wind_stress
+  layers: 2
+  state_fields:
+  - layer_thickness
+  - zonal_velocity_centered
+  - meridional_velocity_centered
+  static_fields:
+  - train_mean_state
+  - coordinates
+  - land_mask
+metrics:
+  definition: 'Mean over the full held-out rollout of layer-thickness MSE, computed by the
+    fixed evaluator in src/evaluation.py. Lower is better.
+
+    '
+  primary: eval_mse_mean
+model:
+  depth: 3
+  fixed_land_cells: true
+  hidden_channels: 64
+  increment_smoothing: 1.0
+  loss: mse
+  mass_conserving: true
+  stochastic_channels: 4
+  stochastic_scale: 8
+  target_mode: residual
+  type: unet
+paths:
+  experiment_log: data/double_gyre_shifting_wind_2layer/logs/20261018T050000-dgsw2l-crps-wide64-spec03.json
+  results_csv: data/double_gyre_shifting_wind_2layer/results.csv
+  rollout_dir: data/double_gyre_shifting_wind_2layer/rollout/
+  training_data: data/double_gyre_shifting_wind_2layer/train/20260408T071500-period40d-duration5000d-2layer.nc
+rollout:
+  autoregressive: true
+  eval_interval_epochs: 5
+  save_outputs: false
+  steps: null
+runtime:
+  device: auto
+  epochs: 60
+  seed: 42
+  smoke_test_epochs: 1
+split:
+  eval_fraction: 0.2
+  method: chronological
+  train_fraction: 0.8
+training:
+  batch_size: 8
+  ema_decay: 0.998
+  gradient_clip_norm: 1.0
+  input_noise_std: 1.0
+  learning_rate: 0.0003
+  loss: crps
+  unroll_steps: 8
+  spectral_loss_weight: 0.3
